@@ -2,71 +2,43 @@ module volume::LinesOfCode
 
 import IO;
 import Set;
-import List;
 import lang::java::jdt::m3::Core;
 
-public int TotalLOC(M3 model)
+public void TotalLOC(M3 model)
 {
 	int count = 0;
 	for (c <- classes(model))
 	{
 		loc source = getOneFrom(model@declarations[c]);
-		count += CountLines(source);
-		//count += (1 + source.end.line - source.begin.line);
+		
+		//regex very slow on large multi-line comments....
+		//println("Class: <c>, Loc: <CountLOC(source)>");
+		
+		//SHOULD we use documentations from m3 
+		//(ie remove all chars on lines that are included in the documentations from compiliation units and then count)?
+		println("Class: <c>, Loc: <model@documentation>");
 	}
 	
-	return count;
-}
-
-public int FieldsInClass(M3 model, loc class)
-{
-	return size([f | f <- model@containment[class], isField(f)]);
+	//return count;
 }
 
 
-//Below first test on a 'file' schema, not using M3
-
-public loc HomeDir()
+public int CountLOC2(loc source)
 {
-	return |file:///c:/Users/Axel/Eclipse%20Projects/SigMM/subjects|;
-}
-
-
-public int TotalLinesOfCode2(loc homedir)
-{
-	if(!isDirectory(homedir))
-		return 0;
 	
-	int count = 0;
-	
-	for(loc location <- homedir.ls)
-	{
-		if(isFile(location))
-		{
-			count += CountLines(location);			
-		}
-		else
-		{
-			count += TotalLinesOfCode(location);
-		}
-	}
-	
-	return count;
 }
 
-public int CountLines(loc file)
+public int CountLOC(loc source)
 {
-    if(exists(file))
-    {
-    	str contents = readFile(file);
-    	int count = 0;
-     	for(/((\*([^*]|[\r\n])*\/)|(\/\/.*)|(^\s*$))/ := contents)
-     	//for(/^[\s*]$/ := contents)
-     	{
-       		count += 1;
-  		}
-  		return count; 	
-    }
-    
-    return 0;
+	int nonLOC = 0;
+	str contents = readFile(source);
+		
+	//find multi-line comments, single-line comments and blanks lines
+ 	for(/((\/*([^*]|[\r\n]|(\*([^\/]|[\r\n])))*\/)|(\/\/.*)|([\s*]\r\n))/ := contents)
+ 	{
+ 		nonLOC += 1;
+ 	}
+	
+	//return (1 + source.end.line - source.begin.line) - nonLOC;
+	return nonLOC; 	
 }
