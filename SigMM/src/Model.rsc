@@ -13,6 +13,6 @@ public void ComputeMetrics(loc project)
 	M3 model = createM3FromEclipseProject(project);
 	println("M3 model built!");	
 	
-	Volume(model);
+	//Volume(model);
 	UnitSize(model);
 }

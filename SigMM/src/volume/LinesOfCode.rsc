@@ -10,11 +10,18 @@ import lang::java::m3::Registry;
 
 public void Volume(M3 model)
 {
-	set[loc] compUnits = { cnt | cnt <- domain(model@containment), cnt.scheme == "java+compilationUnit" };	
-		
 	int volume = 0; 
+	set[loc] compUnits = { cnt | cnt <- domain(model@containment), cnt.scheme == "java+compilationUnit" };	
+	
+	int count = 0;
+	int total = size(compUnits);
+	
 	for(compUnit <- compUnits)
+	{
+		count += 1;
 		volume += ComputeLOC(resolveJava(compUnit), DocsForCU(compUnit, model));
+		println("<count> of <total> - LOCSoFar: <volume>");
+	}
 
 	println("Volume: <volume>");
 }
@@ -22,13 +29,18 @@ public void Volume(M3 model)
 public void UnitSize(M3 model)
 {
 	set[loc] methods = methods(model);
+	
+	int total = size(methods);
+	int count = 0;
+	
 	for(m <- methods)
 	{
+		count += 1;
 		loc mLocation = min(model@declarations[m]);
 		loc mCompUnit = min({ dcl<0> | dcl <- model@declarations, dcl<0>.scheme == "java+compilationUnit" && dcl<1>.uri == mLocation.uri });
 		set[loc] mDocs = {doc | doc <- DocsForCU(mCompUnit, model), IsInRange(mLocation, doc) };
 		
-		println("Unit: <m>, UnitSize: <ComputeLOC(mLocation, mDocs)>");
+		println("Unit <count> of <total>: <m>, UnitSize: <ComputeLOC(mLocation, mDocs)>");
 	}
 }
 
