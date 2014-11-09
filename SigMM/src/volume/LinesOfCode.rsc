@@ -1,44 +1,89 @@
 module volume::LinesOfCode
 
 import IO;
+import List;
 import Set;
-import lang::java::jdt::m3::Core;
+import String;
+import Relation;
+import lang::java::m3::Core;
+import lang::java::m3::Registry;
 
-public void TotalLOC(M3 model)
+public void Volume(M3 model)
 {
-	int count = 0;
-	for (c <- classes(model))
+	set[loc] compUnits = { cnt | cnt <- domain(model@containment), cnt.scheme == "java+compilationUnit" };	
+		
+	int volume = 0; 
+	for(compUnit <- compUnits)
+		volume += ComputeLOC(resolveJava(compUnit), DocsForCU(compUnit, model));
+
+	println("Volume: <volume>");
+}
+
+public void UnitSize(M3 model)
+{
+	set[loc] methods = methods(model);
+	for(m <- methods)
 	{
-		loc source = getOneFrom(model@declarations[c]);
+		loc mLocation = min(model@declarations[m]);
+		loc mCompUnit = min({ dcl<0> | dcl <- model@declarations, dcl<0>.scheme == "java+compilationUnit" && dcl<1>.uri == mLocation.uri });
+		set[loc] mDocs = {doc | doc <- DocsForCU(mCompUnit, model), IsInRange(mLocation, doc) };
 		
-		//regex very slow on large multi-line comments....
-		//println("Class: <c>, Loc: <CountLOC(source)>");
-		
-		//SHOULD we use documentations from m3 
-		//(ie remove all chars on lines that are included in the documentations from compiliation units and then count)?
-		println("Class: <c>, Loc: <model@documentation>");
+		println("Unit: <m>, UnitSize: <ComputeLOC(mLocation, mDocs)>");
 	}
-	
-	//return count;
 }
 
 
-public int CountLOC2(loc source)
+//check if location exists within range of another location 
+private bool IsInRange(loc range, loc target)
 {
+	//target before range
+	if(range.begin.line > target.end.line)
+		return false;
+
+	//target after range
+	if(target.begin.line > range.end.line)
+		return false;
 	
+	return true;
 }
 
-public int CountLOC(loc source)
+
+//return all docs for given computation unit
+private set[loc] DocsForCU(loc cu, M3 model) = { docs<1> | docs <- model@documentation, docs<0> == cu };
+
+
+//compute loc from given source (scheme: project)
+private int ComputeLOC(loc source, set[loc] docs)
 {
-	int nonLOC = 0;
-	str contents = readFile(source);
+	if(source.scheme != "project")
+		throw "ComputeLOC requires a source location with a project scheme! Given source: <source>";
 		
-	//find multi-line comments, single-line comments and blanks lines
- 	for(/((\/*([^*]|[\r\n]|(\*([^\/]|[\r\n])))*\/)|(\/\/.*)|([\s*]\r\n))/ := contents)
- 	{
- 		nonLOC += 1;
- 	}
+	list[str] fileLines = readFileLines(source);
 	
-	//return (1 + source.end.line - source.begin.line) - nonLOC;
-	return nonLOC; 	
+	for(d <- docs)
+	{
+		//indices on which documentation starts/ends in 'source' array 
+		int sIdx = indexOf([source.begin.line..source.end.line], d.begin.line);
+		int eIdx = indexOf([source.begin.line..source.end.line], d.end.line);
+		
+		for(lineIdx <- [sIdx..eIdx + 1])
+		{
+			list[int] chars = chars(fileLines[lineIdx]);
+			int sCol = 0;
+			int eCol = size(chars);
+			
+			if(lineIdx == sIdx)
+				sCol = d.begin.column;
+			if(lineIdx == eIdx)
+				eCol = d.end.column;
+
+			//replace all comment lines with whitespace (32 is ASCII for space)
+			for(colIdx <- [sCol..eCol])
+				chars[colIdx] = 32;
+
+			fileLines[lineIdx] = stringChars(chars);
+		}
+	}							
+		
+	return size( [line | line <- fileLines, trim(line) != "" ] );
 }
