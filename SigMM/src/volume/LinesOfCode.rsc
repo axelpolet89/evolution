@@ -29,10 +29,6 @@ public void Volume(M3 model)
 
 public void UnitSize(M3 model)
 {
-	int total = size(methods(model));
-	int count = 0;
-	set[loc] compUnits = { cnt | cnt <- domain(model@containment), isCompilationUnit(cnt) };
-	
 	/*
 	loc m = getOneFrom([mt | mt <- methods(model), contains(mt.uri, "NoFromResult/isExpressions")]);
 	loc mLocation = min(model@declarations[m]);
@@ -40,52 +36,49 @@ public void UnitSize(M3 model)
 	set[loc] mDocs = {doc | doc <- DocsForCU(mCompUnit, model), IsInRange(mLocation, doc) };
 	ComputeLOC(mLocation, mDocs);
 	*/
-
-		/*
 	
-	map[str, set[loc]] compDocs = ();
+	set[loc] allMethods = methods(model);
+	int total = size(allMethods);
+	int count = 0;
+	int count2 = 0;
 	
-	for(compUnit <- compUnits)
-	{
-		compDocs += (resolveJava(compUnit).uri : DocsForCU(compUnit, model));		
-	}
-	println("docs for cu resolved: <size({k | k <- compDocs})>");
+	map[str, set[loc]] cDocs = ();
+	map[loc, set[loc]] mDocs = ();
 	
-	for(m <- methods(model))
-	{
-		loc mLoc = resolveJava(m);
-		set[loc] mDocs = compDocs[mLoc.uri];
-		mDocs += DocsForCU(m, model);
-		set [loc] docsInRange = {doc | doc <- mDocs, IsInRange(mLoc, doc)};
-		println("Unit <count> of <total>: <m>, UnitSize: <ComputeLOC(mLoc, docsInRange)>");
-	}
-	*/
+	println("started gathering docs..");
 	
-	//top-down
-	for(compUnit <- compUnits)
-	{
-		set[loc] docs = DocsForCU(compUnit, model);	
-				
-		for(c <- getClassRecur(model, { cnt<1> | cnt <- model@containment, cnt<0> == compUnit }))
+	//gather documentation
+	for(decl <- { d | d <- domain(model@declarations), isCompilationUnit(d) || isMethod(d) })
+	{	
+		if(isCompilationUnit(decl))
 		{
-			for(m <- {cnt<1> | cnt <- model@containment, cnt<0> == c, isMethod(cnt<1>) })
-			{
-				loc mLoc = resolveJava(m);
-				println("Unit <count> of <total>: <m>, UnitSize: <ComputeLOC(mLoc, {doc | doc <- docs, IsInRange(mLoc, doc)})>");
-			}
-		}		
+			cDocs += (resolveJava(decl).uri : DocsForLoc(decl, model));
+		}
+		else
+		{
+			mDocs += (decl : DocsForLoc(decl, model));
+		}
 	}
-}
-
-
-//check for inner classes
-private set[loc] getClassRecur(M3 model, set[loc] classes)
-{
-	set[loc] innerClasses = { cnt<1> | cnt <- model@containment, isClass(cnt<1>) && cnt<0> in classes };
-	if(size(innerClasses) == 0)
-		return classes;
 	
-	return (classes + getClassRecur(model, innerClasses));
+	println("docs gathered!");
+	
+	//loop methods
+	for(m <- allMethods)
+	{
+		count+=1;
+		
+		//get method docs
+		set[loc] docs = mDocs[m];
+		
+		//get file location of method
+		loc mLoc = resolveJava(m);
+		
+		//add compilation docs that are in range of method
+		docs += {doc | doc <- cDocs[mLoc.uri], IsInRange(mLoc, doc)};
+		
+		//compute
+		println("Unit <count> of <total>: <m>, UnitSize: <ComputeLOC(mLoc, {doc | doc <- docs, IsInRange(mLoc, doc)})>");
+	}
 }
 
 
@@ -104,8 +97,8 @@ private bool IsInRange(loc range, loc target)
 }
 
 
-//return all docs for given computation unit
-private set[loc] DocsForCU(loc source, M3 model) = { docs<1> | docs <- model@documentation, docs<0> == source };
+//return all docs for given location
+private set[loc] DocsForLoc(loc source, M3 model) = { docs<1> | docs <- model@documentation, docs<0> == source };
 
 
 //compute loc from given source (scheme: project)
@@ -145,6 +138,13 @@ private int ComputeLOC(loc source, set[loc] docs)
 				sCol = indexOf(cIndices, d.begin.column);
 			if(lineIdx == eIdx)
 				eCol = indexOf(cIndices, d.end.column);
+			
+			//fix for javadoc column locations (which are incorrect)
+			if(sCol < 0)
+			{
+				sCol = 0;
+				eCol = size(chars);
+			}
 			
 			//println("line: <fileLines[lineIdx]>");
 			//println("col from-to in 0-<size(chars)>: <sCol>-<eCol>");
