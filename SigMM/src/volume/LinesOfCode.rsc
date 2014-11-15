@@ -1,84 +1,55 @@
 module volume::LinesOfCode
 
 import IO;
+import String;
 import List;
 import Set;
-import String;
+import Map;
 import Relation;
-import ListRelation;
 import lang::java::m3::Core;
 import lang::java::m3::Registry;
 
-public void Volume(M3 model)
+public void Volume(M3 model, map[str, set[loc]] docs)
 {
-	int volume = 0; 
-	set[loc] compUnits = { cnt | cnt <- domain(model@containment), cnt.scheme == "java+compilationUnit" };	
-	
+	set[loc] compUnits = { d | d <- domain(model@declarations), isCompilationUnit(d)};
+		
+	int volume = 0; 		
 	int count = 0;
 	int total = size(compUnits);
 	
-	for(compUnit <- compUnits)
+	for(c <- compUnits)
 	{
 		count += 1;
-		volume += ComputeLOC(resolveJava(compUnit), DocsForCU(compUnit, model));
-		println("<count> of <total> - LOCSoFar: <volume>");
+		loc cLoc = resolveJava(c);
+		volume += ComputeLOC(cLoc, docs[cLoc.uri]);
+		
+		if(count % 5 == 0)
+		{
+			println("<count> of <total> - LOCSoFar: <volume>");
+		}
 	}
 
 	println("Volume: <volume>");
 }
 
-public void UnitSize(M3 model)
-{
-	/*
-	loc m = getOneFrom([mt | mt <- methods(model), contains(mt.uri, "NoFromResult/isExpressions")]);
-	loc mLocation = min(model@declarations[m]);
-	loc mCompUnit = min({ dcl<0> | dcl <- model@declarations, dcl<0>.scheme == "java+compilationUnit" && dcl<1>.uri == mLocation.uri });
-	set[loc] mDocs = {doc | doc <- DocsForCU(mCompUnit, model), IsInRange(mLocation, doc) };
-	ComputeLOC(mLocation, mDocs);
-	*/
-	
-	set[loc] allMethods = methods(model);
-	int total = size(allMethods);
-	int count = 0;
-	int count2 = 0;
-	
-	map[str, set[loc]] cDocs = ();
-	map[loc, set[loc]] mDocs = ();
-	
-	println("started gathering docs..");
-	
-	//gather documentation
-	for(decl <- { d | d <- domain(model@declarations), isCompilationUnit(d) || isMethod(d) })
-	{	
-		if(isCompilationUnit(decl))
-		{
-			cDocs += (resolveJava(decl).uri : DocsForLoc(decl, model));
-		}
-		else
-		{
-			mDocs += (decl : DocsForLoc(decl, model));
-		}
-	}
-	
-	println("docs gathered!");
-	
+public map[loc, int] ComputeUnitSizes(M3 model, map[str, set[loc]] docs)
+{	
+	map[loc, int] result = ();
+	count = 0;
+		
 	//loop methods
-	for(m <- allMethods)
+	for(m <- methods(model))
 	{
-		count+=1;
-		
-		//get method docs
-		set[loc] docs = mDocs[m];
-		
-		//get file location of method
 		loc mLoc = resolveJava(m);
+		result += (m : ComputeLOC(mLoc, {doc | doc <- docs[mLoc.uri], IsInRange(mLoc, doc)}));
 		
-		//add compilation docs that are in range of method
-		docs += {doc | doc <- cDocs[mLoc.uri], IsInRange(mLoc, doc)};
-		
-		//compute
-		println("Unit <count> of <total>: <m>, UnitSize: <ComputeLOC(mLoc, {doc | doc <- docs, IsInRange(mLoc, doc)})>");
+		count+=1;
+		if(count % 100 == 0)
+			println("--\> Processed <count> units so far..");
 	}
+	
+	println("--\> Processed <count> units in total");
+	return result;
 }
 
 
@@ -97,23 +68,14 @@ private bool IsInRange(loc range, loc target)
 }
 
 
-//return all docs for given location
-private set[loc] DocsForLoc(loc source, M3 model) = { docs<1> | docs <- model@documentation, docs<0> == source };
-
-
 //compute loc from given source (scheme: project)
 private int ComputeLOC(loc source, set[loc] docs)
 {
-	//if(source.scheme != "project")
-		//throw "ComputeLOC requires a source location with a project scheme! Given source: <source>";
-		
 	list[str] fileLines = readFileLines(source);
 	list[int] lIndices = [source.begin.line..source.end.line + 1];		 //list is not inclusive
 	
 	//println("source: <source>");
 	//println("docs: <docs>");
-	//println("fileLines: <fileLines>");
-	//println("lIndices : <min(lIndices)>-<max(lIndices)>");
 	
 	for(d <- docs)
 	{	
@@ -121,8 +83,88 @@ private int ComputeLOC(loc source, set[loc] docs)
 		int sIdx = indexOf(lIndices, d.begin.line);
 		int eIdx = indexOf(lIndices, d.end.line);
 		
-		//println("doc: <d>");
-		//println("line from-to in 0-<size(fileLines)-1>: <sIdx>-<eIdx>");
+		for(lineIdx <- [sIdx..eIdx + 1])
+		{
+			list[int] chars = chars(fileLines[lineIdx]);
+			int sCol = 0;
+			int eCol = size(chars);
+			
+			list[int] cIndices = [sCol..eCol + 1];
+						
+			if(lineIdx == 0)
+			{
+				//documentation at begin of source, begin on first char of source
+				sCol = d.begin.column - source.begin.column;
+			}
+			else if(lineIdx == sIdx) 
+			{
+				//first line of documentation; get correct startindex
+				sCol = indexOf(cIndices, d.begin.column); 
+			}
+				
+			if(lineIdx == eIdx)
+			{
+				//last line of documentation; get correct endindex
+				eCol = indexOf(cIndices, d.end.column);
+			}
+
+			//replace all comment lines with whitespace (32 is ASCII for space)
+			for(colIdx <- [sCol..eCol])
+				chars[colIdx] = 32;
+			
+			fileLines[lineIdx] = stringChars(chars);
+		}
+	}							
+		
+	return size( [line | line <- fileLines, trim(line) != "" ] );
+}
+
+
+
+/*==========================================================================*/
+/* OLD STUFF */
+
+public void UnitSizeEx(M3 model, map[str, set[loc]] docs)
+{	
+	set[loc] allMethods = methods(model);
+	int total = size(allMethods);
+	int count = 0;
+		
+	//loop methods
+	for(m <- allMethods)//{mt | mt <- methods(model), contains(mt.uri, "Join/isExpressionsFromThisRow")})
+	{
+		count+=1;
+		
+		//get file location of method
+		loc mLoc = resolveJava(m);
+		
+		//compute
+		println("Unit <count> of <total>: <m>, UnitSize: <ComputeLOC(mLoc, {doc | doc <- docs[mLoc.uri], IsInRange(mLoc, doc)})>");
+	}
+}
+
+//compute loc from given source (scheme: project)
+private int ComputeLOCDebug(loc source, set[loc] docs)
+{
+	//if(source.scheme != "project")
+		//throw "ComputeLOC requires a source location with a project scheme! Given source: <source>";
+		
+	list[str] fileLines = readFileLines(source);
+	list[int] lIndices = [source.begin.line..source.end.line + 1];		 //list is not inclusive
+	
+	println("source: <source>");
+	println("docs: <docs>");
+	println("fileLines: <fileLines>");
+	println("lIndices : <min(lIndices)>-<max(lIndices)>");
+	
+	for(d <- docs)
+	{	
+		//indices on which documentation starts/ends in 'source' array 
+		int sIdx = indexOf(lIndices, d.begin.line);
+		int eIdx = indexOf(lIndices, d.end.line);
+		
+		println("doc: <d>");
+		println("line from-to in 0-<size(fileLines)-1>: <sIdx>-<eIdx>");
 		
 		for(lineIdx <- [sIdx..eIdx + 1])
 		{
@@ -130,35 +172,42 @@ private int ComputeLOC(loc source, set[loc] docs)
 			int sCol = 0;
 			int eCol = size(chars);
 			
-			list[int] cIndices = [0..size(chars) + 1];
-			//println("cIndices : <min(cIndices)>-<max(cIndices)>");
-			//println("cBegin: <d.begin.column>, cEnd: <d.end.column>");
-						
-			if(lineIdx == sIdx)
-				sCol = indexOf(cIndices, d.begin.column);
-			if(lineIdx == eIdx)
-				eCol = indexOf(cIndices, d.end.column);
+			list[int] cIndices = [sCol..eCol + 1];
+			println("cIndices : <min(cIndices)>-<max(cIndices)>");
+			println("cBegin: <d.begin.column -1>, cEnd: <d.end.column>");
 			
-			//fix for javadoc column locations (which are incorrect)
-			if(sCol < 0)
+			if(lineIdx == 0)
 			{
-				sCol = 0;
-				eCol = size(chars);
+				//documentation at begin of source, begin on first char of source
+				sCol = d.begin.column - source.begin.column;
+			}
+			else if(lineIdx == sIdx) 
+			{
+				//first line of documentation; get correct startindex
+				sCol = indexOf(cIndices, d.begin.column); 
+			}
+				
+			if(lineIdx == eIdx)
+			{
+				//last line of documentation; get correct endindex
+				eCol = indexOf(cIndices, d.end.column);
 			}
 			
-			//println("line: <fileLines[lineIdx]>");
-			//println("col from-to in 0-<size(chars)>: <sCol>-<eCol>");
+			println("cBegin: <sCol>, cEnd: <eCol>");
+			
+			println("line: <fileLines[lineIdx]>");
+			println("col from-to in 0-<size(chars)>: <sCol>-<eCol>");
 
 			//replace all comment lines with whitespace (32 is ASCII for space)
 			for(colIdx <- [sCol..eCol])
 				chars[colIdx] = 32;
 			
-			//println("resultline: <stringChars(chars)>");
+			println("resultline: <stringChars(chars)>");
 			
 			fileLines[lineIdx] = stringChars(chars);
 		}
 		
-		//println("final result: <fileLines>");
+		println("final result: <fileLines>");
 	}							
 		
 	return size( [line | line <- fileLines, trim(line) != "" ] );
