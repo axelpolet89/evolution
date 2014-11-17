@@ -1,8 +1,14 @@
 module SigModel
 
-import SigScores;
+import Scores;
+import Risks;
+
 import volume::LinesOfCode;
 import complexity::Cyclomatic;
+import duplication::Simple;
+
+import lang::java::jdt::m3::Core;
+import lang::java::m3::Registry;
 
 import IO;
 import DateTime;
@@ -10,9 +16,6 @@ import Set;
 import Map;
 import Relation;
 import List;
-import util::Math;
-import lang::java::jdt::m3::Core;
-import lang::java::m3::Registry;
 
 public loc prjDude = |project://Dude|;
 public loc prjSS = |project://SmallSql|;
@@ -24,63 +27,6 @@ str CC = "CC";
 str D = "D";
 str US = "US";
 str UT = "UT";
-
-//Main call to compute SIG metrics
-public void ComputeMetrics(loc project)
-{
-	println("started building M3 model...");
-	M3 model = createM3FromEclipseProject(project);
-	println("M3 model built!\n");	
-	
-	println("started gathering docs...");
-	map[str, map[bool, set[loc]]] docs = ParseDocs(model);
-	println("docs gathered!\n");
-	
-	println("started computing volume...");
-	datetime s1 = now();
-	int volume = 24221;//Volume(model, docs);
-	datetime e1 = now();
-	println("volume computed!\n");
-	
-	println("started computing unit sizes...");
-	datetime s2 = now();
-	map[loc, int] unitSizes = ComputeUnitSizes(model, docs);
-	datetime e2 = now();
-	println("unit sizes computed!\n");
-	
-	println("started computing unit complexities...");
-	datetime s3 = now();
-	map[loc, int] unitComplexities = ComputeUnitComplexities(project);		
-	datetime e3 = now();	
-	println("unit complexities computed!\n");
-
-	
-	int unitsLOC = 0;
-	for(key <- unitSizes)
-		unitsLOC += unitSizes[key];
-	
-	map[Risk, int] unitSizeRisks = ComputeRelativeRisks(RisksForUnitSizes(unitSizes), unitsLOC);
-	map[Risk, int] unitComplexityRisks = ComputeRelativeRisks(RisksForUnitComplexities(unitComplexities, unitSizes), unitsLOC);
-	
-	println("Unit size risks:");
-	PrintRisks(unitSizeRisks);
-	println("Unit complexity risks:");
-	PrintRisks(unitComplexityRisks);
-	
-	
-	Score scoreV = GetVolumeScore(volume);
-	Score scoreCC = GetUnitScore(unitComplexityRisks);
-	Score scoreD = N();
-	Score scoreUS = GetUnitScore(unitSizeRisks);
-	Score scoreUT = N();
-	
-	println("SIG scores:");
-	PrintScores((V:scoreV,CC:scoreCC,D:scoreD,US:scoreUS,UT:scoreUT));
-	
-	println("\nVolume process time: <createDuration(s1, e1)>");
-	println("UnitSize process time: <createDuration(s2, e2)>");
-	println("UnitComplexity process time: <createDuration(s3, e3)>");
-}
 
 //Get all documentation for M3, mapped on java file - javadoc? - documentation
 private map[str,  map[bool, set[loc]]] ParseDocs(M3 model)
@@ -106,42 +52,80 @@ private map[str,  map[bool, set[loc]]] ParseDocs(M3 model)
 	return prjDocs;
 }
 
-
-
-/*=========================================*/
-/*		 	SIG Risks for Units			   */
-
-private map[Risk, int] RisksForUnitSizes(map[loc, int] unitSizes)
+private str ParseDuration(datetime s, datetime e)
 {
-	map[Risk, int] risks = (Low():0, Mod():0, High():0, Very():0);
+	d = createDuration(s, e);	
+	return "<d[4]> minutes, <d[5]>.<d[6]> seconds";
+}
+
+//Main call to compute SIG metrics
+public void ComputeMetrics(loc project)
+{
+	println("started building M3 model...");
+	M3 model = createM3FromEclipseProject(project);
+	println("M3 model built!\n");	
+	
+	println("started gathering docs...");
+	datetime sD = now();
+	map[str, map[bool, set[loc]]] docs = ParseDocs(model);
+	datetime eD = now();
+	println("docs gathered!\n");
+	
+	println("started computing volume...");
+	datetime s1 = now();
+	int volume = 24221;//Volume(model, docs);
+	datetime e1 = now();
+	println("volume computed!\n");
+	
+	println("started computing unit sizes...");
+	datetime s2 = now();
+	//map[loc, int] unitSizes = ComputeUnitSizes(model, docs);
+	map[loc, list[str]] units = ComputeUnitSizesEx(model, docs);
+	map[loc, int] unitSizes = ();
+	for(key <- units)
+		unitSizes[key] = size(units[key]);
+	datetime e2 = now();
+	println("unit sizes computed!\n");
+	
+	println("started search for duplicates...");
+	datetime s4 = now();
+	int duplications = FindDuplicates(units);
+	datetime e4 = now();
+	println("completed duplicates search!\n");
+	println("duplicate code: <duplications>\n");
+	
+	println("started computing unit complexities...");
+	datetime s3 = now();
+	map[loc, int] unitComplexities = ComputeUnitComplexities(project);		
+	datetime e3 = now();	
+	println("unit complexities computed!\n");
+	
+	int unitsLOC = 0;
 	for(key <- unitSizes)
-	{
-		int size = unitSizes[key];
-		risks[RiskForUnit(size)] += size;
-	}	
-	return risks;
+		unitsLOC += unitSizes[key];
+	
+	map[Risk, int] unitSizeRisks = RisksForUnitSizes(unitSizes, unitsLOC);
+	map[Risk, int] unitComplexityRisks = RisksForUnitComplexities(unitComplexities, unitSizes, unitsLOC);
+	
+	println("Unit size risks:");
+	PrintRisks(unitSizeRisks);
+	println("Unit complexity risks:");
+	PrintRisks(unitComplexityRisks);
+	
+	Score scoreV = GetVolumeScore(volume);
+	Score scoreCC = GetUnitScore(unitComplexityRisks);
+	Score scoreD = N();
+	Score scoreUS = GetUnitScore(unitSizeRisks);
+	Score scoreUT = N();
+	
+	println("\n--\> Documentation gather time: <ParseDuration(sD, eD)>");
+	println("--\> Volume process time: <ParseDuration(s1, e1)>");
+	println("--\> UnitSize process time: <ParseDuration(s2, e2)>");
+	println("--\> UnitComplexity process time: <ParseDuration(s3, e3)>");
+	println("\n--\>SIG scores:");
+	PrintScores((V:scoreV,CC:scoreCC,D:scoreD,US:scoreUS,UT:scoreUT));
 }
 
-private map[Risk, int] RisksForUnitComplexities(map[loc, int] unitComplexities, map[loc, int] unitSizes)
-{
-	map[Risk, int] risks = (Low():0, Mod():0, High():0, Very():0);
-	for(key <- unitSizes)
-	{
-		loc method = resolveJava(key);
-		risks[RiskForUnit(unitComplexities[method])] += unitSizes[key];
-	}	
-	return risks;
-}
-
-private map[Risk, int] ComputeRelativeRisks(map[Risk, int] risks, int volume)
-{
-	map[Risk, int] relativeRisks = (Low():0, Mod():0, High():0, Very():0);
-	for(r <- risks)
-	{
-		relativeRisks[r] += round(toReal(risks[r])/toReal(volume)*100);
-	}
-	return relativeRisks;
-}
 
 
 
