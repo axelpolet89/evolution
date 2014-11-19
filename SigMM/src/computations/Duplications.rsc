@@ -5,8 +5,24 @@ import Map;
 import List;
 import IO;
 import String;
+import Relation;
+import lang::java::m3::Core;
+import lang::java::m3::Registry;
 
-public void MatchClasses(map[loc, list[str]] compilationUnits)
+// return count of total lines found as duplicate
+public int CountDuplicateLines(map[loc, list[str]] compilationUnits)
+{
+	map[list[str], list[tuple[loc, int, int]]] duplicates = FindDuplicates(compilationUnits);
+	
+	int dupLoc = 0;
+	for(k <- duplicates)
+		dupLoc += size(k) * size(duplicates[k]) + size(k);
+
+	return dupLoc;
+}
+
+// find duplicates, returns a map of duplicate lines along with a list of locations and start/end indices
+public map[list[str], list[tuple[loc, int, int]]] FindDuplicates (map[loc, list[str]] compilationUnits)
 {
 	int blockSize = 6;
 	
@@ -17,43 +33,54 @@ public void MatchClasses(map[loc, list[str]] compilationUnits)
 	for(key <- compilationUnits)
 	{
 		count += 1;
-		
+
 		list[str] source = [trim(c) | c <- compilationUnits[key]];
-		println(key);
 		
+		if(size(source) < blockSize)
+			continue;
+		
+		//used for extending found duplicates
 		int prevEnd = 0;
 		list[str] prevBlock = [];
+		
 		for(i <- [0..size(source)-blockSize])
 		{				
 			list[str] block = source[i..(i+blockSize)];
-			
+
 			if(block notin blocks)
 			{
+				//no duplicate, just remember
 				blocks[block] = <key, i, i+blockSize>;
 			}
 			else
 			{
+				//extend found duplicate if it's end index is 1 more than the previous' block end index
 				if(i-1 == prevEnd)
 				{
+					//remove old block from duplicates
 					dups = delete(dups, prevBlock);
-					list[str] new = prevBlock + block[5];
 					
-					if(new in dups)
-						dups[new] += <key,prevEnd-blockSize, i>;
+					//extend previous block with last line of current block
+					list[str] extension = prevBlock + block[5];
+					
+					//add extended duplicate to map, (if another duplicate of same block exists, add to to list)
+					if(extension in dups)
+						dups[extension] += [<key,prevEnd-blockSize, i>];
 					else
-						dups[new] = [<key,prevEnd-blockSize, i>];
+						dups[extension] = [<key,prevEnd-blockSize, i>];
 					
-					//println("not normal: <size(dups)> <new>");	
-					prevBlock = new;
+					//update previous block for (potential) further extension	
+					prevBlock = extension;
 				}
 				else
 				{
+					//add duplicate to map, (if another duplicate of same block exists, add to to list)
 					if(block in dups)
-						dups[block] += <key,i,i+blockSize>;
+						dups[block] += [ <key,i,i+blockSize> ];
 					else
 						dups[block] = [<key,i,i+blockSize>];
 				
-					//println("normal: <size(dups)> <block>");
+					//update previous block for (potential) further extension
 					prevBlock = block;
 				}
 				
@@ -61,16 +88,11 @@ public void MatchClasses(map[loc, list[str]] compilationUnits)
 			}			
 		}
 		
-		
-	
+		if(count % 10 == 0)
+			println("<count> compilation units checked for duplications so far..");
 	}
 	
-	int dupLoc = 0;
-	for(k <- dups)
-	{
-		dupLoc += size(k);
-		println(k);
-	}
+	println("--\> checked <count> compilation unites for duplications in total");
 	
-	print(dupLoc);
+	return dups;
 }

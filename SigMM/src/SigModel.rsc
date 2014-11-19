@@ -62,16 +62,16 @@ private str ParseDuration(datetime s, datetime e)
 
 public void ComputeDude()
 {
-	 ComputeMetrics(prjDude, true, false);
+	 ComputeMetrics(prjDude, true);
 }
 
 public void ComputeSS()
 {
-	 ComputeMetrics(prjSS, true, false);
+	 ComputeMetrics(prjSS, true);
 }
 
 //Main call to compute SIG metrics
-public void ComputeMetrics(loc project, bool enableV, bool enableD)
+public void ComputeMetrics(loc project, bool enableD)
 {
 	Score scoreV = N();
 	Score scoreCC = N(); 
@@ -92,21 +92,28 @@ public void ComputeMetrics(loc project, bool enableV, bool enableD)
 	timings += "--\> Documentation gather time: <ParseDuration(sD, eD)>";
 	println("docs gathered!\n");
 	
-	int volume = 24221;
-	if(enableV)
+	
+	println("started computing volume...");
+	datetime s1 = now();
+	tuple[int, map[loc, list[str]]] compilationUnits = GetModelVolume(model, docs);
+	int volume = compilationUnits<0>;		
+	datetime e1 = now();
+	timings += "--\> Volume process time: <ParseDuration(s1, e1)>";
+	println("--\> Total LOC : <volume>");
+	println("volume computed!");	
+	
+	int duplicateLOC = 0;
+	if(enableD)
 	{
-		println("started computing volume...");
-		datetime s1 = now();
-		tuple[int, map[loc, list[str]]] cuSizes = GetModelVolume(model, docs);
-		volume = cuSizes<0>;		
-		datetime e1 = now();
-		timings += "--\> Volume process time: <ParseDuration(s1, e1)>";
-		println("--\> Total LOC : <volume>");
-		println("volume computed!");
-		
-		MatchClasses(cuSizes<1>);
+		println("\nstarted search for duplicates...");
+		datetime s4 = now();
+		duplicateLOC = CountDuplicateLines(compilationUnits<1>);
+		datetime e4 = now();
+		timings += "--\> Duplication search time: <ParseDuration(s4, e4)>";
+		println("--\> Total LOC in duplicates: <duplicateLOC>");
+		println("completed duplicates search!");
 	}
-
+	
 	println("\nstarted computing unit sizes...");
 	datetime s2 = now();
 	map[loc, int] unitSizes = GetModelUnitSizes(model, docs);
@@ -126,20 +133,14 @@ public void ComputeMetrics(loc project, bool enableV, bool enableD)
 	timings += "--\> UnitComplexity process time: <ParseDuration(s3, e3)>";
 	println("unit complexities computed!");
 	
-	int duplications = 0;
-	if(enableD)
-	{
-		println("\nstarted search for duplicates...");
-		datetime s4 = now();
-		int duplications = FindDuplicates(units);
-		datetime e4 = now();
-		timings += "--\> Duplication search time: <ParseDuration(s4, e4)>";
-		println("completed duplicates search!");
-	}
-	
 	println("\ncomputing scores...");
 	
 	scoreV = GetVolumeScore(volume);
+	
+	if(enableD)
+		scoreD = GetDuplicationScore(duplicateLOC, volume);
+	
+	println("\nduplication percentage: <GetPercentage(duplicateLOC, volume)>%");
 	
 	map[Risk, int] unitSizeRisks = RisksForUnitSizes(unitSizes, locInUnits);
 	scoreUS = GetUnitScore(unitSizeRisks);
