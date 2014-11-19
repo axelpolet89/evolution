@@ -19,6 +19,7 @@ private Risk RiskForUnit(int complexity)
 	return Low();
 }
 
+//calculatie relative percentage of low, moderate, high, very high risks to total volume
 private map[Risk, int] ComputeRelativeRisks(map[Risk, int] risks, int volume)
 {
 	map[Risk, int] relativeRisks = (Low():0, Mod():0, High():0, Very():0);
@@ -29,6 +30,7 @@ private map[Risk, int] ComputeRelativeRisks(map[Risk, int] risks, int volume)
 	return relativeRisks;
 }
 
+//return risks for unit size relative to volume
 public map[Risk, int] RisksForUnitSizes(map[loc, int] unitSizes, int volume)
 {
 	map[Risk, int] risks = (Low():0, Mod():0, High():0, Very():0);
@@ -40,6 +42,7 @@ public map[Risk, int] RisksForUnitSizes(map[loc, int] unitSizes, int volume)
 	return ComputeRelativeRisks(risks, volume);
 }
 
+//return risks for unit complexities relative to volume
 public map[Risk, int] RisksForUnitComplexities(map[loc, int] unitComplexities, map[loc, int] unitSizes, int volume)
 {
 	map[Risk, int] risks = (Low():0, Mod():0, High():0, Very():0);

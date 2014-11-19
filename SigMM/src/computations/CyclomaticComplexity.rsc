@@ -1,8 +1,8 @@
-module complexity::Cyclomatic
+module computations::CyclomaticComplexity
 
 import lang::java::jdt::m3::AST;
 
-public map[loc,int] ComputeUnitComplexities(loc project)
+public map[loc,int] GetUnitComplexitiesForProject(loc project)
 {
 	map[loc,int] methodsC = ();
 	
@@ -10,7 +10,7 @@ public map[loc,int] ComputeUnitComplexities(loc project)
 	{
 		case m : \method(_,_,_,_, Statement impl):
 			{
-				methodsC += (m@src : countDecisionPoints(impl));
+				methodsC += (m@src : CountComplexity(impl));
 			}
 		case mm : \method(_,_,_,_):
 			{
@@ -18,14 +18,14 @@ public map[loc,int] ComputeUnitComplexities(loc project)
 			}
 		case c : \constructor(_,_,_, Statement impl):
 			{
-				methodsC += (c@src : countDecisionPoints(impl));
+				methodsC += (c@src : CountComplexity(impl));
 			}
 	}
 	
 	return methodsC;
 }
 
-public int countDecisionPoints(Statement stat)
+public int CountComplexity(Statement stat)
 {
 	n = 1;
 	visit(stat) {

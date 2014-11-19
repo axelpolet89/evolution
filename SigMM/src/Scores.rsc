@@ -85,7 +85,7 @@ public Score GetVolumeScore(int volume)
 		return N();
 	
 	if(volume > 66000)
-		return P;
+		return P();
 	
 	return PP();
 }

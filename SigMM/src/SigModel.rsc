@@ -3,9 +3,9 @@ module SigModel
 import Scores;
 import Risks;
 
-import volume::LinesOfCode;
-import complexity::Cyclomatic;
-import duplication::Simple;
+import computations::LinesOfCode;
+import computations::CyclomaticComplexity;
+import computations::Duplications;
 
 import lang::java::jdt::m3::Core;
 import lang::java::m3::Registry;
@@ -18,6 +18,7 @@ import Relation;
 import List;
 
 public loc prjDude = |project://Dude|;
+public loc prjDude2 = |project://Dude/src|;
 public loc prjSS = |project://SmallSql|;
 public loc prjHS = |project://hsqldb|;
 
@@ -31,9 +32,10 @@ str UT = "UT";
 //Get all documentation for M3, mapped on java file - javadoc? - documentation
 private map[str,  map[bool, set[loc]]] ParseDocs(M3 model)
 {
-	map[str, map[bool, set[loc]]] prjDocs = ();
+	println("# of docs in M3: <size(model@documentation)>");
 	
-	rel[loc, loc] docs = { <resolveJava(d<0>), d<1>>  | d <- model@documentation };
+	map[str, map[bool, set[loc]]] prjDocs = ();
+		
 	for(doc <- model@documentation)
 	{	
 		bool javadoc = !isCompilationUnit(doc<0>);
@@ -58,9 +60,27 @@ private str ParseDuration(datetime s, datetime e)
 	return "<d[4]> minutes, <d[5]>.<d[6]> seconds";
 }
 
-//Main call to compute SIG metrics
-public void ComputeMetrics(loc project)
+public void ComputeDude()
 {
+	 ComputeMetrics(prjDude, true, false);
+}
+
+public void ComputeSS()
+{
+	 ComputeMetrics(prjSS, false, false);
+}
+
+//Main call to compute SIG metrics
+public void ComputeMetrics(loc project, bool enableV, bool enableD)
+{
+	Score scoreV = N();
+	Score scoreCC = N(); 
+	Score scoreD = N();
+	Score scoreUS = N();
+	Score scoreUT = N();
+	
+	list[str] timings = [];
+
 	println("started building M3 model...");
 	M3 model = createM3FromEclipseProject(project);
 	println("M3 model built!\n");	
@@ -69,74 +89,82 @@ public void ComputeMetrics(loc project)
 	datetime sD = now();
 	map[str, map[bool, set[loc]]] docs = ParseDocs(model);
 	datetime eD = now();
+	timings += "--\> Documentation gather time: <ParseDuration(sD, eD)>";
 	println("docs gathered!\n");
 	
-	println("started computing volume...");
-	datetime s1 = now();
-	int volume = 24221;//Volume(model, docs);
-	datetime e1 = now();
-	println("volume computed!\n");
+	int volume = 24221;
 	
-	println("started computing unit sizes...");
+	if(enableV)
+	{
+		println("started computing volume...");
+		datetime s1 = now();
+		tuple[int, map[loc, list[str]]] cuSizes = GetModelVolume(model, docs);
+		volume = cuSizes<0>;
+		scoreV = GetVolumeScore(volume);
+		datetime e1 = now();
+		timings += "--\> Volume process time: <ParseDuration(s1, e1)>";
+		println("volume computed!");
+	}
+	println("Total LOC : <volume>");
+
+		
+	println("\nstarted computing unit sizes...");
 	datetime s2 = now();
-	//map[loc, int] unitSizes = ComputeUnitSizes(model, docs);
-	map[loc, list[str]] units = ComputeUnitSizesEx(model, docs);
-	map[loc, int] unitSizes = ();
-	for(key <- units)
-		unitSizes[key] = size(units[key]);
+	map[loc, int] unitSizes = GetModelUnitSizes(model, docs);
+	
+	int totalLOCinUnits = 0;
+	for(key <- unitSizes) totalLOCinUnits += unitSizes[key];
+		
+	map[Risk, int] unitSizeRisks = RisksForUnitSizes(unitSizes, totalLOCinUnits);
+	scoreUS = GetUnitScore(unitSizeRisks);
 	datetime e2 = now();
-	println("unit sizes computed!\n");
-	
-	println("started search for duplicates...");
-	datetime s4 = now();
-	int duplications = FindDuplicates(units);
-	datetime e4 = now();
-	println("completed duplicates search!\n");
-	println("duplicate code: <duplications>\n");
-	
-	println("started computing unit complexities...");
-	datetime s3 = now();
-	map[loc, int] unitComplexities = ComputeUnitComplexities(project);		
-	datetime e3 = now();	
-	println("unit complexities computed!\n");
-	
-	int unitsLOC = 0;
-	for(key <- unitSizes)
-		unitsLOC += unitSizes[key];
-	
-	map[Risk, int] unitSizeRisks = RisksForUnitSizes(unitSizes, unitsLOC);
-	map[Risk, int] unitComplexityRisks = RisksForUnitComplexities(unitComplexities, unitSizes, unitsLOC);
-	
-	println("Unit size risks:");
+	timings += "--\> UnitSize process time: <ParseDuration(s2, e2)>";
+	println("unit sizes computed!");
+	println("unit size risks:");
 	PrintRisks(unitSizeRisks);
-	println("Unit complexity risks:");
+
+	
+	println("\nstarted computing unit complexities...");
+	datetime s3 = now();
+	map[loc, int] unitComplexities = GetUnitComplexitiesForProject(project);
+	map[Risk, int] unitComplexityRisks = RisksForUnitComplexities(unitComplexities, unitSizes, totalLOCinUnits);	
+	scoreCC = GetUnitScore(unitComplexityRisks);
+	datetime e3 = now();	
+	timings += "--\> UnitComplexity process time: <ParseDuration(s3, e3)>";
+	println("unit complexities computed!");
+	println("unit complexity risks:");
 	PrintRisks(unitComplexityRisks);
 	
-	Score scoreV = GetVolumeScore(volume);
-	Score scoreCC = GetUnitScore(unitComplexityRisks);
-	Score scoreD = N();
-	Score scoreUS = GetUnitScore(unitSizeRisks);
-	Score scoreUT = N();
-	
-	println("\n--\> Documentation gather time: <ParseDuration(sD, eD)>");
-	println("--\> Volume process time: <ParseDuration(s1, e1)>");
-	println("--\> UnitSize process time: <ParseDuration(s2, e2)>");
-	println("--\> UnitComplexity process time: <ParseDuration(s3, e3)>");
-	println("\n--\>SIG scores:");
+	int duplications = 0;
+	if(enableD)
+	{
+		println("\nstarted search for duplicates...");
+		datetime s4 = now();
+		int duplications = FindDuplicates(units);
+		datetime e4 = now();
+		timings += "--\> Duplication search time: <ParseDuration(s4, e4)>";
+		println("completed duplicates search!");
+	}
+
+	println("\nSIG scores:");
 	PrintScores((V:scoreV,CC:scoreCC,D:scoreD,US:scoreUS,UT:scoreUT));
+		
+	println("\n");
+	for(t <- timings)
+		println(t);
 }
 
 
 
 
 /*=========================================*/
-/*		 	SIG Results Output			   */
+/*		 	OUTPUT						   */
 
 private void PrintRisks(map[Risk, int] risks)
 {
 	str headers = "\tLow\tMod\tHigh\tVery High";
 	str values = "\t<risks[Low()]>%\t<risks[Mod()]>%\t<risks[High()]>%\t<risks[Very()]>%";
-	println("\n<headers>\n<values>\n");
+	println("<headers>\n<values>");
 }
 
 private void PrintScores(map[str, Score] scores)
