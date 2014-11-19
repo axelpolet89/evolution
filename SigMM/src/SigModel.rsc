@@ -103,6 +103,8 @@ public void ComputeMetrics(loc project, bool enableV, bool enableD)
 		timings += "--\> Volume process time: <ParseDuration(s1, e1)>";
 		println("--\> Total LOC : <volume>");
 		println("volume computed!");
+		
+		MatchClasses(cuSizes<1>);
 	}
 
 	println("\nstarted computing unit sizes...");
