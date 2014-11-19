@@ -1,13 +1,9 @@
 module computations::Duplications
 
-import Set;
 import Map;
 import List;
-import IO;
 import String;
-import Relation;
-import lang::java::m3::Core;
-import lang::java::m3::Registry;
+import IO;
 
 // return count of total lines found as duplicate
 public int CountDuplicateLines(map[loc, list[str]] compilationUnits)
