@@ -12,10 +12,10 @@ private Risk RiskForUnit(int complexity)
 	if(complexity > 50)
 		return Very();
 	
-	if(complexity > 21)
+	if(complexity > 20)
 		return High();
 	
-	if(complexity > 11)
+	if(complexity > 10)
 		return Mod();
 	
 	return Low();

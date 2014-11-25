@@ -22,15 +22,13 @@ public tuple[int, map[loc, list[str]]] GetModelVolume(M3 model, map[str, map[boo
 	for(cUnit <- cmpUnits)
 	{
 		loc cLoc = resolveJava(cUnit);
-		list[str] lines = ParseSourceNoDocs(cLoc, docs[cLoc.uri][false]);
-		
-		//filter javadoc (faster)
-		int totalJavaDoc = 0;
-		for(d <- {doc | doc <- docs[cLoc.uri][true]})
-			for(idx <- [d.begin.line-1..d.end.line])
-				lines[idx] = "";
+		list[str] lines = FilterNonJavaDoc(cLoc, docs[cLoc.uri][false]);
+		lines = FilterJavaDocFromCU(lines, {doc | doc <- docs[cLoc.uri][true]});
 
+		//store filtered lines for later use (duplication)
 		cuSizes[cUnit] = TrimWhiteLines(lines);
+		
+		//compute volume (so-far) here
 		volume += size(cuSizes[cUnit]);
 		
 		count += 1;
@@ -53,10 +51,11 @@ public map[loc, int] GetModelUnitSizes(M3 model, map[str, map[bool, set[loc]]] d
 	for(m <- methods(model))
 	{		
 		loc mLoc = resolveJava(m);
-		list[str] lines = ParseSourceNoDocs(mLoc, {doc | doc <- docs[mLoc.uri][false], IsInRange(mLoc, doc)});		
-		int unitLOC = size(TrimWhiteLines(lines));
-				
-		//substract javadoc (faster)
+		
+		//all lines withoud normal docs
+		int unitLOC = size(FilterNonJavaDoc(mLoc, {doc | doc <- docs[mLoc.uri][false], IsInRange(mLoc, doc)}));		
+		
+		//substract javadoc total
 		int totalJavaDoc = 0;
 		for(d <- {doc | doc <- docs[mLoc.uri][true], IsInRange(mLoc, doc)})
 			totalJavaDoc += (d.end.line - d.begin.line + 1);
@@ -141,6 +140,77 @@ private list[str] ParseSourceNoDocs(loc source, set[loc] docs)
 			eCol = indexOf([sCol..size(line) + 1], d.end.column);
 			
 			fileLines[eIdx] = ReplaceWithWhiteSpace(line, sCol, eCol);
+		}
+		
+		//println(TrimWhiteLines(fileLines[sIdx..eIdx+1]));
+	}	
+			
+	return fileLines;						
+}
+
+private list[str] FilterJavaDocFromCU(list[str] lines, set[loc] javadocs)
+{
+	for(d <- javadocs)
+		for(idx <- [d.begin.line-1..d.end.line])
+			if(idx <= size(lines))
+				lines[idx] = "";
+				
+	return lines;
+}
+
+//return list[str] with contents in which documentation is replaced with whitespace
+private list[str] FilterNonJavaDoc(loc source, set[loc] docs)
+{
+	list[str] fileLines = readFileLines(source);
+		
+	for(d <- docs)
+	{		
+		int sIdx = d.begin.line - source.begin.line;
+		int eIdx = sIdx + (d.end.line - d.begin.line);		
+		
+		if(eIdx == sIdx)
+		{
+			str line = fileLines[sIdx];
+						
+			int sCol = d.begin.column;
+			int eCol = d.end.column;		
+			
+			//get correct startindex
+			if(sIdx == 0)
+			{
+				sCol = d.begin.column - source.begin.column;
+				eCol = d.end.column - sCol;
+			}
+				
+			if(eCol > size(line))
+				eCol = d.end.column - d.begin.column;
+				
+			fileLines[sIdx] =  ReplaceWithWhiteSpace(line, sCol, eCol);
+		}		
+		else
+		{
+			//first docline
+			str line = fileLines[sIdx];		
+			int sCol = d.begin.column;
+			
+			//get correct startindex if source.line equals doc.line
+			if(sIdx == 0)
+				sCol = d.begin.column - source.begin.column;
+				
+			fileLines[sIdx] = ReplaceWithWhiteSpace(line, sCol, size(line));
+					
+			//middle doclines	
+			for(idx <- [sIdx+1..eIdx])
+				fileLines[idx] = "";
+			
+			//last docline
+			line = fileLines[eIdx];	
+			sCol = 0;
+			int eCol = d.end.column;
+			if(eCol > size(line))
+				eCol = d.end.column - d.begin.column;
+			
+			fileLines[eIdx] = ReplaceWithWhiteSpace(line, sCol, eCol);			
 		}
 	}	
 		

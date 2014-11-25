@@ -20,7 +20,7 @@ import List;
 public loc prjDude = |project://Dude|;
 public loc prjDude2 = |project://Dude/src|;
 public loc prjSS = |project://SmallSql|;
-public loc prjHS = |project://hsqldb|;
+public loc prjHS = |project://hsqldb-2.3.1|;
 
 //const strings for SIG scores on volume, complexity, duplicates, unit sizes, unit tests
 str V = "V";
@@ -68,6 +68,11 @@ public void ComputeDude()
 public void ComputeSS()
 {
 	 ComputeMetrics(prjSS, true);
+}
+
+public void ComputeHS()
+{
+	 ComputeMetrics(prjHS, true);
 }
 
 //Main call to compute SIG metrics
@@ -155,7 +160,7 @@ public void ComputeMetrics(loc project, bool enableD)
 	PrintRisks(unitComplexityRisks);
 	
 	println("\nSIG scores:");
-	PrintScores((V:scoreV,CC:scoreCC,D:scoreD,US:scoreUS,UT:scoreUT));
+	PrintScores((V:scoreV,CC:scoreCC,D:scoreD,US:scoreUS));
 		
 	println("\n");
 	for(t <- timings)
@@ -177,18 +182,18 @@ private void PrintRisks(map[Risk, int] risks)
 
 private void PrintScores(map[str, Score] scores)
 {
-	Score An = MergeScores([scores[s] | s <- scores, s in {V,D,US,UT}]);
+	Score An = MergeScores([scores[s] | s <- scores, s in {V,D,US}]);
 	Score Ch = MergeScores([scores[s] | s <- scores, s in {CC,D}]);
-	Score St = MergeScores([scores[s] | s <- scores, s in {UT}]);
-	Score Ts = MergeScores([scores[s] | s <- scores, s in {CC,US,UT}]);
+	//Score St = MergeScores([scores[s] | s <- scores, s in {UT}]);
+	Score Ts = MergeScores([scores[s] | s <- scores, s in {CC,US}]);
 	
-	println(InsertTabs(["",V,CC,D,US,UT]));
-	println(InsertTabs("" + SelectScores(scores, [V,CC,D,US,UT])));
+	println(InsertTabs(["",V,CC,D,US]));
+	println(InsertTabs("" + SelectScores(scores, [V,CC,D,US])));
 	println(InsertTabs(["-------------------------------------------------"]));
-	println(InsertTabs("Any" + SelectScores(scores, [V,"",D,US,UT]) + ToString(An)));
-	println(InsertTabs("Chn" + SelectScores(scores, ["",CC,D,"",""]) + ToString(Ch)));
-	println(InsertTabs("Stb" + SelectScores(scores, ["","","","",UT]) + ToString(St)));
-	println(InsertTabs("Tst" + SelectScores(scores, ["",CC,"",US,UT]) + ToString(Ts)));
+	println(InsertTabs("Any" + SelectScores(scores, [V,"",D,US]) + ToString(An)));
+	println(InsertTabs("Chn" + SelectScores(scores, ["",CC,D,""]) + ToString(Ch)));
+	println(InsertTabs("Stb" + SelectScores(scores, ["","","",""]) + "N/A"));
+	println(InsertTabs("Tst" + SelectScores(scores, ["",CC,"",US]) + ToString(Ts)));
 }
 
 private list[str] SelectScores(map[str, Score] scores, list[str] selection)
