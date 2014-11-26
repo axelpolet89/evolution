@@ -12,7 +12,7 @@ public int CountDuplicateLines(map[loc, list[str]] compilationUnits)
 	
 	int dupLoc = 0;
 	for(k <- duplicates)
-		dupLoc += size(k) * size(duplicates[k]) + size(k);
+		dupLoc += size(k) * size(duplicates[k]);// + size(k);
 
 	return dupLoc;
 }
@@ -50,26 +50,42 @@ public map[list[str], list[tuple[loc, int, int]]] FindDuplicates (map[loc, list[
 			}
 			else
 			{
+				
+				
 				//extend found duplicate if it's end index is 1 more than the previous' block end index
 				if(i-1 == prevEnd)
 				{
-					//remove old block from duplicates
-					if(size(dups[prevBlock]) == 1)
-						dups = delete(dups, prevBlock);
-					else
-					{
-						list[tuple[loc,int,int]] matches = dups[prevBlock];
-						dups[prevBlock] = delete(matches, size(matches) - 1);
-					}
-					
 					//extend previous block with last line of current block
 					list[str] extension = prevBlock + block[5];
-					
-					//add extended duplicate to map, (if another duplicate of same block exists, add to to list)
-					if(extension in dups)
-						dups[extension] += [<key,prevEnd-blockSize, i>];
+				
+					//remove old block from duplicates
+					if(size(dups[prevBlock]) == 2)
+					{
+						println("replace with extended");
+						list[tuple[loc l, int b, int e]] p1 = dups[prevBlock];
+						
+						dups[extension] = [];
+						
+						for(t <- p1)
+							dups[extension] += [<t.l, t.b, t.e +1>];
+						
+						dups = delete(dups, prevBlock);
+					}
 					else
-						dups[extension] = [<key,prevEnd-blockSize, i>];
+					{
+						println("add another extended");
+						
+						dups[extension] = [];
+						
+						tuple[loc l, int b, int e] p2 = head(dups[prevBlock]);
+						tuple[loc l, int b, int e] p3 = last(dups[prevBlock]);
+						
+						dups[extension] += [<p2.l, p2.b, p2.e+1>];
+						dups[extension] += [<p3.l, p3.b, p3.e+1>];
+						
+						list[tuple[loc,int,int]] matches = dups[prevBlock];
+						dups[prevBlock] = delete(matches, size(matches)-1);
+					}
 					
 					//update previous block for (potential) further extension	
 					prevBlock = extension;
@@ -78,9 +94,16 @@ public map[list[str], list[tuple[loc, int, int]]] FindDuplicates (map[loc, list[
 				{
 					//add duplicate to map, (if another duplicate of same block exists, add to to list)
 					if(block in dups)
+					{
 						dups[block] += [ <key,i,i+blockSize> ];
+						println("added duplicate: <size(dups[block])>");
+					}
 					else
-						dups[block] = [<key,i,i+blockSize>];
+					{
+						dups[block] = [blocks[block]];
+						dups[block] += [<key,i,i+blockSize>];
+						println("initial duplicates created");
+					}
 				
 					//update previous block for (potential) further extension
 					prevBlock = block;
