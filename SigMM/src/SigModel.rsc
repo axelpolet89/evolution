@@ -20,6 +20,7 @@ import List;
 public loc prjDude = |project://Dude|;
 public loc prjDude2 = |project://Dude/src|;
 public loc prjSS = |project://SmallSql|;
+public loc prjSS2 = |project://smallsql0.21|;
 public loc prjHS = |project://hsqldb-2.3.1|;
 
 //const strings for SIG scores on volume, complexity, duplicates, unit sizes, unit tests
