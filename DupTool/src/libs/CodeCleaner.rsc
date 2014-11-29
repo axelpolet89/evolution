@@ -6,13 +6,15 @@ import List;
 import Set;
 import Map;
 import Relation;
+
 import lang::java::m3::Core;
 import lang::java::m3::Registry;
+import libs::LocationHelpers;
 
 //return total volume and every compilation unit with their lines of code (needed for duplication scan)
-public tuple[int, map[loc, list[str]]] GetModelVolume(M3 model, map[str, set[loc]] docs)
+public tuple[int, map[loc, list[lline]]] GetModelVolume(M3 model, map[str, set[loc]] docs)
 {
-	map[loc,list[str]] cuSizes = ();
+	map[loc,list[lline]] cuSizes = ();
 	set[loc] cmpUnits = { d | d <- domain(model@declarations), isCompilationUnit(d)};
 			
 	int volume = 0;
@@ -22,10 +24,12 @@ public tuple[int, map[loc, list[str]]] GetModelVolume(M3 model, map[str, set[loc
 	for(cUnit <- cmpUnits)
 	{
 		loc cLoc = resolveJava(cUnit);
-		list[str] lines = TrimWhiteLines(FilterDocumentation(cLoc, docs[cLoc.uri]));
+		
+			
+		list[lline] lines = TrimWhiteLines(FilterDocumentation(cLoc, docs[cLoc.uri]));
 
 		//store filtered lines for later use (duplication)
-		cuSizes[cUnit] = lines;
+		cuSizes[cLoc] = lines;
 		
 		//compute volume (so-far) here
 		volume += size(lines);
@@ -54,9 +58,9 @@ private bool IsInRange(loc range, loc target)
 }
 
 //return list[str] with contents in which documentation is replaced with whitespace
-private list[str] FilterDocumentation(loc source, set[loc] docs)
+private list[lline] FilterDocumentation(loc source, set[loc] docs)
 {
-	list[str] fileLines = readFileLines(source);
+	list[lline] lines = GetLineDescriptors(readFileLines(source));
 		
 	for(d <- docs)
 	{		
@@ -65,7 +69,7 @@ private list[str] FilterDocumentation(loc source, set[loc] docs)
 		
 		if(eIdx == sIdx)
 		{
-			str line = fileLines[sIdx];
+			str line = lines[sIdx][0];
 						
 			int sCol = d.begin.column;
 			int eCol = d.end.column;		
@@ -80,38 +84,38 @@ private list[str] FilterDocumentation(loc source, set[loc] docs)
 			if(eCol > size(line))
 				eCol = d.end.column - d.begin.column;
 				
-			fileLines[sIdx] =  ReplaceWithWhiteSpace(line, sCol, eCol);
+			lines[sIdx] = <ReplaceWithWhiteSpace(line, sCol, eCol), lines[sIdx][1], lines[sIdx][2]>;
 		}		
 		else
 		{
 			//first docline
-			str line = fileLines[sIdx];		
+			str line = lines[sIdx][0];		
 			int sCol = d.begin.column;
 			
 			//get correct startindex if source.line equals doc.line
 			if(sIdx == 0)
 				sCol = d.begin.column - source.begin.column;
 				
-			fileLines[sIdx] = ReplaceWithWhiteSpace(line, sCol, size(line));
+			lines[sIdx] = <ReplaceWithWhiteSpace(line, sCol, size(line)), lines[sIdx][1], lines[sIdx][2]>;
 					
 			//middle doclines	
 			for(idx <- [sIdx+1..eIdx])
-				fileLines[idx] = "";
+				lines[idx] = <"",lines[idx][1],lines[idx][2]>;
 			
 			//last docline
-			line = fileLines[eIdx];	
+			line = lines[eIdx][0];	
 			sCol = 0;
 			int eCol = d.end.column;
 			if(eCol > size(line))
 				eCol = d.end.column - d.begin.column;
 			
-			fileLines[eIdx] = ReplaceWithWhiteSpace(line, sCol, eCol);			
+			lines[eIdx] = <ReplaceWithWhiteSpace(line, sCol, eCol), lines[eIdx][1], lines[eIdx][2]>;		
 		}
 	}	
 		
-	return fileLines;						
+	return lines;						
 }
 
-private list[str] TrimWhiteLines(list[str] lines) = [line | line <- lines, trim(line) != ""];
+private list[lline] TrimWhiteLines(list[lline] lines) = [line | line <- lines, trim(line[0]) != ""];
 
 private str ReplaceWithWhiteSpace(str line, int sCol, int eCol) = substring(line, 0, sCol) + substring(line, eCol);

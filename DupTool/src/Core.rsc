@@ -2,6 +2,7 @@ module Core
 
 import libs::CodeCleaner;
 import libs::DuplicationSearch;
+import libs::LocationHelpers;
 
 import lang::java::jdt::m3::Core;
 import lang::java::m3::Registry;
@@ -19,6 +20,9 @@ public loc prjDude2 = |project://Dude/src|;
 public loc prjSS = |project://SmallSql|;
 public loc prjSS2 = |project://smallsql0.21|;
 public loc prjHS = |project://hsqldb-2.3.1|;
+public loc prjDE = |project://DuplicationExamples|;
+
+alias lline = tuple[str,int,int];
 
 //Get all documentation for M3, mapped on java file - javadoc? - documentation
 private map[str,  set[loc]] ParseDocs(M3 model)
@@ -68,6 +72,11 @@ public void ComputeHS()
 	 ComputeMetrics(prjHS);
 }
 
+public void ComputeDE()
+{
+	ComputeMetrics(prjDE);
+}
+
 //Main call to compute SIG metrics
 public void ComputeMetrics(loc project)
 {
@@ -86,7 +95,7 @@ public void ComputeMetrics(loc project)
 	
 	println("started computing volume...");
 	datetime s1 = now();
-	tuple[int, map[loc, list[str]]] compilationUnits = GetModelVolume(model, docs);
+	tuple[int, map[loc, list[lline]]] compilationUnits = GetModelVolume(model, docs);
 	int volume = compilationUnits<0>;		
 	datetime e1 = now();
 	timings += "--\> Volume process time: <ParseDuration(s1, e1)>";
