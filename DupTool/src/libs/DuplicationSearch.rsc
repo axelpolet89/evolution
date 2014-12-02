@@ -24,9 +24,6 @@ public int CountDuplicateLines(map[loc, list[lline]] compilationUnits)
 		if(size(toSet(duplicates[k])) != size(duplicates[k]))
 			println("error!");
 	}
-	
-	println([e | d <- domain(duplicates), e := size(d)]);
-
 
 	return dupLoc;
 }
@@ -73,14 +70,13 @@ public map[list[str], list[duploc]] FindDuplicates (map[loc, list[lline]] compil
 				if(matched)
 				{
 					if(prevBlock notin dups)
-						dups[prevBlock] = [prevMatchL] + [prevMatchR];
+					{
+						dups[prevBlock] = [GetActualLocation(prevMatchL, compilationUnits[prevMatchL[0]])] + [GetActualLocation(prevMatchR, source)];
+					}
 					else
-						dups[prevBlock] += [prevMatchR];
-					
-					lline s = source[prevMatchR[1]];
-					lline e = source[prevMatchR[2]-1];
-					int length = e[2]-s[2]+2;
-					//println(ModifyLocation(prevMatchR[0],s[2],length,s[1],e[1]));
+					{
+						dups[prevBlock] += [GetActualLocation(prevMatchR, source)];
+					}
 					
 					/* //interpolate in existing matches (in case extensions also have submatches with other code)
 					
@@ -138,4 +134,12 @@ public map[list[str], list[duploc]] FindDuplicates (map[loc, list[lline]] compil
 	println("--\> checked <count> compilation unites for duplications in total");
 	
 	return dups;
+}
+
+private duploc GetActualLocation(duploc orig, list[lline] source)
+{
+	lline s = source[orig[1]];		//start of match, e[2] is offset
+	lline e = source[orig[2]-1];	//end of match e[1] is linenr
+	int length = e[2]-s[2]+2;		//length in chars/bytes
+	return <ModifyLocation(orig[0],s[2],length,s[1],e[1]), orig[1], orig[2]>;
 }

@@ -3,6 +3,7 @@ module Core
 import libs::CodeCleaner;
 import libs::DuplicationSearch;
 import libs::LocationHelpers;
+import ReportBuilder;
 
 import lang::java::jdt::m3::Core;
 import lang::java::m3::Registry;
@@ -23,6 +24,8 @@ public loc prjHS = |project://hsqldb-2.3.1|;
 public loc prjDE = |project://DuplicationExamples|;
 
 alias lline = tuple[str,int,int];
+
+private loc outputFolder = |file:///c:/users/axel/desktop|;
 
 //Get all documentation for M3, mapped on java file - javadoc? - documentation
 private map[str,  set[loc]] ParseDocs(M3 model)
@@ -104,16 +107,64 @@ public void ComputeMetrics(loc project)
 	int duplicateLOC = 0;
 	println("\nstarted search for duplicates...");
 	datetime s4 = now();
-	duplicateLOC = CountDuplicateLines(compilationUnits<1>);
+	//duplicateLOC = CountDuplicateLines(compilationUnits<1>);
+	duplications = FindDuplicates(compilationUnits<1>);
 	datetime e4 = now();
 	timings += "--\> Duplication search time: <ParseDuration(s4, e4)>";
 	println("completed duplicates search!");
 	
-	println("\n--\> Total LOC : <volume>");
-	println("--\> Total LOC in duplicates: <duplicateLOC>");
-	println("\nduplication percentage: <GetPercentage(duplicateLOC, volume)>%");
-			
-	println("\n");
+	//println("\n--\> Total LOC : <volume>");
+	//println("--\> Total LOC in duplicates: <duplicateLOC>");
+	//println("\nduplication percentage: <GetPercentage(duplicateLOC, volume)>%");
+	println("");
 	for(t <- timings)
 		println(t);
+	
+	println("\n");	
+	list[str] stats = GetDuplicationStatistics(project, volume, duplications);
+	for(s <- stats)
+		println(s);	
+	
+	loc outputFile = outputFolder + "report_duptool_<printTime(now(), "yyyyMMdd_HH-mm-ss")>.txt";
+	ListToFile(outputFile, stats);
+	println("\nStatistics saved in <outputFile>");
+}
+
+
+private list[str] GetDuplicationStatistics(loc project, int volume, map[list[str], list[duploc]] duplications)
+{
+	list[str] result = [];
+	
+	result += "Duplication Statistics for Java project: <project.uri>\r\n";
+	result += "Volume:\t\t\t\t<volume> SLOC";
+	
+	int dupsVol = 0;
+	for(k <- duplications)
+		dupsVol += size(k) * size(duplications[k]);
+	
+	result += "Duplicate lines:\t\t<dupsVol> SLOC\r\n";
+	result += "Percentage of clones:\t\t<GetPercentage(dupsVol, volume)>%\r\n";
+	
+	result += "Total # of clone classes:\t<size(domain(duplications))>";
+	
+	list[str] biggest = max(domain(duplications));
+	list[duploc] bClass = duplications[biggest];
+	result += "Biggest clone:\t\t\t<size(biggest)> SLOC";
+	result += "Biggest clone class:\t\t<bClass[0][0]> -\> line <bClass[0][0].begin.line> to <bClass[0][0].end.line>";
+	for(i <- [1..size(duplications[biggest])])		
+		result += "\t\t\t\t<bClass[i][0]>  -\> line <bClass[i][0].begin.line> to <bClass[i][0].end.line>";
+	
+	return result;
+}
+
+private void ListToFile(loc file, list[str] lines)
+{	
+	if(!isFile(file))
+		writeFile(file);
+	
+	for(s <- lines)
+	{
+		appendToFile(file, s);
+		appendToFile(file, "\r\n");
+	}
 }

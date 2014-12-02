@@ -25,6 +25,7 @@ public list[lline] GetLineDescriptors(list[str] lines)
 	for(i <- [0..size(lines)])
 	{	
 		str line = lines[i];		
+		
 		int extra = 1;
 		if(startsWith(line,"\t"))
 			extra += 1;
