@@ -78,28 +78,7 @@ public map[list[str], list[duploc]] FindDuplicates (map[loc, list[lline]] compil
 						dups[prevBlock] += [GetActualLocation(prevMatchR, source)];
 					}
 					
-					/* //interpolate in existing matches (in case extensions also have submatches with other code)
-					
-					loc refMatch = prevMatchOrig[0];
-					if(refMatch in curMatches)
-					{
-						for(cm <- [cm | cm <- curMatches[refMatch], prevMatchOrig[1] > cm[0][1] && prevMatchOrig[2] <= cm[0][2]])
-						{
-							bl refCu = cm[0];
-							bl thisCu = cm[1];
-							dups[prevBlock] += [<thisCu[0], thisCu[1] + (prevMatchOrig[1]-refCu[1]),thisCu[2] - (refCu[2]-prevMatchOrig[2])>];
-						}
-					}
-					else
-					{		
-						curMatches[refMatch] = [];
-					}
-					
-					if(prevMatchOrig[0] != prevMatch[0])
-						curMatches[refMatch] += [<prevMatchOrig, prevMatch>];
-						
-					*/
-					
+					//reset
 					prevMatchL = <key, -1, -1>;
 		 			prevMatchR = <key, -1, -1>;
 					prevBlock = [];

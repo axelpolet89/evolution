@@ -20,7 +20,8 @@ public loc prjDude = |project://Dude|;
 public loc prjDude2 = |project://Dude/src|;
 public loc prjSS = |project://SmallSql|;
 public loc prjSS2 = |project://smallsql0.21|;
-public loc prjHS = |project://hsqldb-2.3.1|;
+public loc prjHS = |project://hsqldb|;
+public loc prjHS2 = |project://hsqldb-2.3.1|;
 public loc prjDE = |project://DuplicationExamples|;
 
 alias lline = tuple[str,int,int];
@@ -37,7 +38,11 @@ private map[str,  set[loc]] ParseDocs(M3 model)
 	println("--\> started mapping docs on compilation-unit uri...");	
 	for(doc <- model@documentation)
 	{	
-		str prj = resolveJava(doc<0>).uri;
+		str prj = "";
+		loc d = doc[0];
+	    if (<d, src> <- model@declarations)
+	    	prj = src.uri;
+      
 		if(prj in prjDocs)
 		{
 			prjDocs[prj] += { doc<1> };
