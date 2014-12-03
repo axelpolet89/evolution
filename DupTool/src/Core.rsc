@@ -3,7 +3,6 @@ module Core
 import libs::CodeCleaner;
 import libs::DuplicationSearch;
 import libs::LocationHelpers;
-import ReportBuilder;
 
 import lang::java::jdt::m3::Core;
 import lang::java::m3::Registry;
@@ -31,30 +30,33 @@ private loc outputFolder = |file:///c:/users/axel/desktop|;
 //Get all documentation for M3, mapped on java file - javadoc? - documentation
 private map[str,  set[loc]] ParseDocs(M3 model)
 {
-	println("--\> # of docs in M3: <size(model@documentation)>");
+	map[str, set[loc]] docs = ();
 	
-	map[str, set[loc]] prjDocs = ();
-	
+	int total = size(model@documentation);
+	println("--\> # of docs in M3: <total>");
 	println("--\> started mapping docs on compilation-unit uri...");	
+	
+	int count = 0;
 	for(doc <- model@documentation)
 	{	
-		str prj = "";
+		str cUri;
 		loc d = doc[0];
-	    if (<d, src> <- model@declarations)
-	    	prj = src.uri;
+		if (<d, src> <- model@declarations)
+    		cUri = src.uri;
       
-		if(prj in prjDocs)
-		{
-			prjDocs[prj] += { doc<1> };
-		}
+		if(cUri in docs)
+			docs[cUri] += { doc[1] };
 		else
-		{
-			prjDocs[prj] = { doc<1> };
-		}
+			docs[cUri] = { doc[1] };	
+		
+		count +=1;
+		
+		if(count % 100 == 0)
+			println("--\> mapped <count> of <total> docs so far.."); 
 	}
-	println("--\> mapped documentation on <size(domain(prjDocs))> compilation-units!");
 	
-	return prjDocs;
+	println("--\> mapped documentation on <size(docs)> compilation-units!");
+	return docs;
 }
 
 private str ParseDuration(datetime s, datetime e)
@@ -63,7 +65,7 @@ private str ParseDuration(datetime s, datetime e)
 	return "<d[4]> minutes, <d[5]>.<d[6]> seconds";
 }
 
-private int GetPercentage(int num1, int num2) = round(toReal(num1)/toReal(num2)*100);
+private real GetPercentage(int num1, int num2) = round(toReal(num1)/toReal(num2)*100,0.11);
 
 public void ComputeDude()
 {
@@ -131,7 +133,7 @@ public void ComputeMetrics(loc project)
 		println(s);	
 	
 	loc outputFile = outputFolder + "report_duptool_<printTime(now(), "yyyyMMdd_HH-mm-ss")>.txt";
-	ListToFile(outputFile, stats);
+	//ListToFile(outputFile, stats);
 	println("\nStatistics saved in <outputFile>");
 }
 
@@ -142,17 +144,13 @@ private list[str] GetDuplicationStatistics(loc project, int volume, map[list[str
 	
 	result += "Duplication Statistics for Java project: <project.uri>\r\n";
 	result += "Volume:\t\t\t\t<volume> SLOC";
-	
-	int dupsVol = 0;
-	for(k <- duplications)
-		dupsVol += size(k) * size(duplications[k]);
+		
+	int dupsVol = GetCloneTotal(duplications);
 	
 	result += "Duplicate lines:\t\t<dupsVol> SLOC";
 	result += "Percentage of clones:\t\t<GetPercentage(dupsVol, volume)>%\r\n";
 	
 	result += "Total # of clone classes:\t<size(domain(duplications))>\r\n";
-	
-	//println("duplications: <duplications>");
 	
 	set[list[str]] dups = domain(duplications);
 	int max = 0;

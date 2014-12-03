@@ -8,7 +8,7 @@ import Map;
 import Relation;
 
 import lang::java::m3::Core;
-import lang::java::m3::Registry;
+//import lang::java::m3::Registry;
 import libs::LocationHelpers;
 
 //return total volume and every compilation unit with their lines of code (needed for duplication scan)
@@ -23,7 +23,7 @@ public tuple[int, map[loc, list[lline]]] GetModelVolume(M3 model, map[str, set[l
 	
 	for(cUnit <- cmpUnits)
 	{
-		loc cLoc = resolveJava(cUnit);
+		loc cLoc = ResolveProjectLoc(cUnit, model);
 		
 			
 		list[lline] lines = TrimWhiteLines(FilterDocumentation(cLoc, docs[cLoc.uri]));
@@ -61,7 +61,7 @@ private bool IsInRange(loc range, loc target)
 private list[lline] FilterDocumentation(loc source, set[loc] docs)
 {
 	list[lline] lines = GetLineDescriptors(readFileLines(source));
-		
+	
 	for(d <- docs)
 	{		
 		int sIdx = d.begin.line - source.begin.line;

@@ -1,19 +1,24 @@
 module libs::LocationHelpers
 
-import libs::Aliasses;
-
 import List;
 import String;
+import lang::java::jdt::m3::Core;
 
 alias lline = tuple[str,int,int];
 
-public loc ModifyLocation(loc source, int offset, int length, int begin, int end)
+public loc ResolveProjectLoc(loc location, M3 model)
 {
+    if (<location, src> <- model@declarations)
+    	return src;
+}
+
+public loc ModifyLocation(loc source, int offset, int length, int begin, int end)
+{	
 	loc result = source;
 	result.offset = offset;
 	result.length = length;
 	result.begin = <begin,0>;
-	result.end = <end,10>;
+	result.end = <end,0>;
 	return result;
 }
 
@@ -24,18 +29,9 @@ public list[lline] GetLineDescriptors(list[str] lines)
 	int offset = 0;
 	for(i <- [0..size(lines)])
 	{	
-		str line = lines[i];		
-		
-		int extra = 1;
-		if(startsWith(line,"\t"))
-			extra += 1;
-		if(endsWith(line,"\t"))
-			extra += 1;
-		if(trim(line) == "")
-			extra -= 1;
-			
+		str line = lines[i];					
 		lds += <line,i+1,offset>;
-		offset += size(line) + extra;
+		offset += size(line) + 2;
 	}
 	
 	return lds;
