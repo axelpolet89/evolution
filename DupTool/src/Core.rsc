@@ -142,17 +142,52 @@ private list[str] GetDuplicationStatistics(loc project, int volume, map[list[str
 	for(k <- duplications)
 		dupsVol += size(k) * size(duplications[k]);
 	
-	result += "Duplicate lines:\t\t<dupsVol> SLOC\r\n";
+	result += "Duplicate lines:\t\t<dupsVol> SLOC";
 	result += "Percentage of clones:\t\t<GetPercentage(dupsVol, volume)>%\r\n";
 	
-	result += "Total # of clone classes:\t<size(domain(duplications))>";
+	result += "Total # of clone classes:\t<size(domain(duplications))>\r\n";
 	
-	list[str] biggest = max(domain(duplications));
-	list[duploc] bClass = duplications[biggest];
-	result += "Biggest clone:\t\t\t<size(biggest)> SLOC";
-	result += "Biggest clone class:\t\t<bClass[0][0]> -\> line <bClass[0][0].begin.line> to <bClass[0][0].end.line>";
-	for(i <- [1..size(duplications[biggest])])		
+	//println("duplications: <duplications>");
+	
+	set[list[str]] dups = domain(duplications);
+	int max = 0;
+	list[str] bDup = [];
+	for(d <- dups)
+	{
+		int s = size(d);
+		if(s > max)
+		{
+			max = s;
+			bDup = d;
+		}
+	}
+	
+	max = 0;
+	list[str] bClassDup = [];
+	list[duploc] bClass = [];
+	for(key <- duplications)
+	{
+		list[duploc] class = duplications[key]; 
+		int s = size(class);
+		if(s > max)
+		{
+			max = s;
+			bClass = class;
+			bClassDup = key;
+		}
+	}
+	
+	result += "Biggest clone:\t\t\t<size(bDup)> SLOC\r\n";
+	for(i <- [0..size(bDup)])
+		result += "\t\t\t\t<bDup[i]>"; 
+	
+	result += "\r\nBiggest clone class:\t\t<bClass[0][0]> -\> line <bClass[0][0].begin.line> to <bClass[0][0].end.line>";
+	for(i <- [1..size(bClass)])		
 		result += "\t\t\t\t<bClass[i][0]>  -\> line <bClass[i][0].begin.line> to <bClass[i][0].end.line>";
+	result+="";
+	for(i <- [0..size(bClassDup)])
+		result += "\t\t\t\t<bClassDup[i]>"; 
+	
 	
 	return result;
 }
