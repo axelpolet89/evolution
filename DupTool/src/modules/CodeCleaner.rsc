@@ -1,4 +1,4 @@
-module libs::CodeCleaner
+module modules::CodeCleaner
 
 import IO;
 import String;
@@ -8,28 +8,28 @@ import Map;
 import Relation;
 
 import lang::java::m3::Core;
-//import lang::java::m3::Registry;
-import libs::LocationHelpers;
+import helpers::Location;
 
 //return total volume and every compilation unit with their lines of code (needed for duplication scan)
 public tuple[int, map[loc, list[lline]]] GetModelVolume(M3 model, map[str, set[loc]] docs)
 {
-	map[loc,list[lline]] cuSizes = ();
-	set[loc] cmpUnits = { d | d <- domain(model@declarations), isCompilationUnit(d)};
+	map[loc,list[lline]] cSizes = ();
+	set[loc] cUnits = { d | d <- domain(model@declarations), isCompilationUnit(d)};
 			
 	int volume = 0;
 	int count = 0;
-	int total = size(cmpUnits);
+	int total = size(cUnits);
 	
-	for(cUnit <- cmpUnits)
+	for(cUnit <- cUnits)
 	{
-		loc cLoc = ResolveProjectLoc(cUnit, model);
-		
+		loc cLoc;
+		if (<cUnit, src> <- model@declarations)
+    		cLoc = src;
 			
-		list[lline] lines = TrimWhiteLines(FilterDocumentation(cLoc, docs[cLoc.uri]));
+		list[lline] lines = [line | line <- FilterDocumentation(cLoc, docs[cLoc.uri]), trim(line[0]) != ""];
 
 		//store filtered lines for later use (duplication)
-		cuSizes[cLoc] = lines;
+		cSizes[cLoc] = lines;
 		
 		//compute volume (so-far) here
 		volume += size(lines);
@@ -40,7 +40,7 @@ public tuple[int, map[loc, list[lline]]] GetModelVolume(M3 model, map[str, set[l
 	}
 
 	println("--\> Processed <count> compilation units in total");
-	return <volume, cuSizes>;
+	return <volume, cSizes>;
 }
 
 //check if location exists within range of another location 
@@ -115,7 +115,5 @@ private list[lline] FilterDocumentation(loc source, set[loc] docs)
 		
 	return lines;						
 }
-
-private list[lline] TrimWhiteLines(list[lline] lines) = [line | line <- lines, trim(line[0]) != ""];
 
 private str ReplaceWithWhiteSpace(str line, int sCol, int eCol) = substring(line, 0, sCol) + substring(line, eCol);

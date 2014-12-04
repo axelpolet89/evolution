@@ -1,4 +1,4 @@
-module libs::DuplicationSearch
+module modules::DuplicationSearch
 
 import Set;
 import Map;
@@ -7,81 +7,9 @@ import String;
 import util::Math;
 import IO;
 
-import libs::LocationHelpers;
+import helpers::Location;
 
 alias duploc = tuple[loc, int, int];
-
-// return count of total lines found as duplicate
-public int CountDuplicateLines(map[loc, list[lline]] compilationUnits)
-{
-	map[list[str], list[duploc]] duplicates = FindDuplicates(compilationUnits);
-	
-	int dupLoc = 0;
-	for(k <- duplicates)
-	{
-		println("class: <duplicates[k]>\nlines: <k>");
-		dupLoc += size(k) * size(toSet(duplicates[k]));// + size(k);
-		
-		if(size(toSet(duplicates[k])) != size(duplicates[k]))
-			println("error!");
-	}
-
-	return dupLoc;
-}
-
-public map[str, list[duploc]] GetSortedCcs(map[list[str], list[duploc]] ccs)
-{
-	map[str, list[duploc]] sccs = ();
-	
-	//transform cloneclasses into sorted comp-unit -> clones
-	for(key <- ccs)
-	{
-		list[duploc] dup = ccs[key];
-		for(d <- dup)
-		{
-			str dUri = d[0].uri;
-			if(dUri notin sccs)
-			{
-				sccs[dUri] = [d];
-			}
-			else
-			{
-				sccs[dUri] += [d];
-			}
-		}
-	}
-	
-	//sort clones descending per comp-unit 
-	for(key <- sccs)
-		sccs[key] = sort(sccs[key], bool(duploc a, duploc b){ return (a[2]-a[1]) > (b[2]-b[1]); });
-		
-	return sccs;
-}
-
-public int GetCloneTotal(map[list[str], list[duploc]] ccs)
-{
-	map[str, list[duploc]] sccs = GetSortedCcs(ccs);
-	
-	for(key <- sccs)
-	{
-		//start with smalles clone in comp-unit
-		list[duploc] dup = reverse(sccs[key]);
-		for(d <- dup)
-		{
-			//check if any wrappers exist that cover this clone entirely
-			list[duploc] cloneWrappers = [pc | pc <- dup, (d[1] > pc[1] && d[2] <= pc[2]) 
-															|| (d[1] >= pc[1] && d[2] < pc[2])];
-			if(size(cloneWrappers) > 0)
-				sccs[key] = sccs[key] - d;
-		}
-	}
-	
-	num total = 0;
-	for(cs <- range(sccs))		
-		total += sum([len | c <- cs, len := (c[2]-c[1]+1)]);
-		
-	return toInt(total);
-}
 
 // find duplicates, returns a map of duplicate lines along with a list of locations and start/end indices
 public map[list[str], list[duploc]] FindDuplicates (map[loc, list[lline]] compilationUnits)
@@ -196,7 +124,61 @@ public map[list[str], list[duploc]] FindDuplicates (map[loc, list[lline]] compil
 	return dups;
 }
 
-private duploc GetActualLocation(duploc orig, list[lline] source)
+public int GetCloneTotal(map[list[str], list[duploc]] ccs)
+{
+	map[str, list[duploc]] sccs = GetSortedCcs(ccs);
+	
+	for(key <- sccs)
+	{
+		//start with smalles clone in comp-unit
+		list[duploc] dup = reverse(sccs[key]);
+		for(d <- dup)
+		{
+			//check if any wrappers exist that cover this clone entirely
+			list[duploc] cloneWrappers = [pc | pc <- dup, (d[1] > pc[1] && d[2] <= pc[2]) 
+															|| (d[1] >= pc[1] && d[2] < pc[2])];
+			if(size(cloneWrappers) > 0)
+				sccs[key] = sccs[key] - d;
+		}
+	}
+	
+	num total = 0;
+	for(cs <- range(sccs))		
+		total += sum([len | c <- cs, len := (c[2]-c[1]+1)]);
+		
+	return toInt(total);
+}
+
+private map[str, list[duploc]] GetSortedCcs(map[list[str], list[duploc]] ccs)
+{
+	map[str, list[duploc]] sccs = ();
+	
+	//transform cloneclasses into sorted comp-unit -> clones
+	for(key <- ccs)
+	{
+		list[duploc] dup = ccs[key];
+		for(d <- dup)
+		{
+			str dUri = d[0].uri;
+			if(dUri notin sccs)
+			{
+				sccs[dUri] = [d];
+			}
+			else
+			{
+				sccs[dUri] += [d];
+			}
+		}
+	}
+	
+	//sort clones descending per comp-unit 
+	for(key <- sccs)
+		sccs[key] = sort(sccs[key], bool(duploc a, duploc b){ return (a[2]-a[1]) > (b[2]-b[1]); });
+		
+	return sccs;
+}
+
+public duploc GetActualLocation(duploc orig, list[lline] source)
 {
 	lline s = source[orig[1]];		//get original lline for the begin of match
 	lline e = source[orig[2]];		//get original lline for the end of match

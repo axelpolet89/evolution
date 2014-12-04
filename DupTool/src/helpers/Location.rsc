@@ -1,16 +1,9 @@
-module libs::LocationHelpers
+module helpers::Location
 
 import List;
 import String;
-import lang::java::jdt::m3::Core;
 
 alias lline = tuple[str,int,int];
-
-public loc ResolveProjectLoc(loc location, M3 model)
-{
-    if (<location, src> <- model@declarations)
-    	return src;
-}
 
 public loc ModifyLocation(loc source, int offset, int length, int begin, int end)
 {	

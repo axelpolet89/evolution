@@ -1,8 +1,7 @@
 module Core
 
-import libs::CodeCleaner;
-import libs::DuplicationSearch;
-import libs::LocationHelpers;
+import modules::CodeCleaner;
+import modules::DuplicationSearch;
 
 import lang::java::jdt::m3::Core;
 import lang::java::m3::Registry;
