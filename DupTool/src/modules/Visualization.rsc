@@ -126,21 +126,20 @@ private Figure drawClassContents(CLASS c)
 	list[LineDecoration] cloneLines = [];
 	
 	set[tuple[int,int]] lines = {};
-	
+		
 	for(cl <- c.clones)
 	{
 		int b = cl.name.begin.line;
 		int e = cl.name.end.line;
-		if(size({l | l <- lines, b > l[0] && e < l[1]}) > 0)
-		{ 
-			for(i <- [b..e + 1])
-				cloneLines += highlight(i,"",6);
-		}
-		else
-		{
-			for(i <- [b..e + 1])
-				cloneLines += highlight(i,"",7);
-		}
+		int color = 7;
+		
+		if(size({cs | cs <- cl.cloneClass, c.name.uri != cs[0].uri}) == 0)
+			color = 4;
+		else if(size({l | l <- lines, b > l[0] && e < l[1]}) > 0)
+			color = 6;
+		
+		for(i <- [b..e + 1])
+			cloneLines += highlight(i,"",color);
 		lines += <b,e>;
 	}
 
