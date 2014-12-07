@@ -1,3 +1,6 @@
+/*
+ * This class contains a large and small clone (small inner/outer clone, large outer clone)
+ */
 public class utils
 {	
 	//same name

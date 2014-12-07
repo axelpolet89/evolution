@@ -29,3 +29,22 @@ public list[lline] GetLineDescriptors(list[str] lines)
 	
 	return lds;
 }
+
+//check if location exists within range of another location 
+public bool IsInRange(loc range, loc target)
+{
+	//target before range
+	if(range.begin.line > target.end.line)
+		return false;
+
+	//target after range
+	if(target.begin.line > range.end.line)
+		return false;
+	
+	return true;
+}
+
+public int colBgn(loc source) = source.begin.column;
+public int colEnd(loc source) = source.end.column;
+public int lineBgn(loc source) = source.begin.line;
+public int lineEnd(loc source) = source.end.line;

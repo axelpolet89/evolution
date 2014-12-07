@@ -1,7 +1,7 @@
 module Core
 
 import modules::CodeCleaner;
-import modules::DuplicationSearch;
+import modules::CloneDetector;
 import modules::Visualization;
 import helpers::m3;
 
@@ -79,19 +79,19 @@ public void ComputeMetrics(loc project)
 	println("volume computed!");	
 	
 	int duplicateLOC = 0;
-	println("\nstarted search for duplicates...");
+	println("\nstarted search for clones...");
 	datetime s4 = now();
-	duplications = FindDuplicates(compilationUnits<1>);
+	duplications = FindClones(compilationUnits<1>);
 	datetime e4 = now();
-	timings += "--\> Duplication search time: <ParseDuration(s4, e4)>";
-	println("completed duplicates search!");
+	timings += "--\> clone search time: <ParseDuration(s4, e4)>";
+	println("completed clone search!");
 
 	println("");
 	for(t <- timings)
 		println(t);
 	
 	println("\n");	
-	list[str] stats = GetDuplicationStatistics(project, volume, duplications);
+	list[str] stats = GetCloneStatistics(project, volume, duplications);
 	for(s <- stats)
 		println(s);	
 	
@@ -103,7 +103,7 @@ public void ComputeMetrics(loc project)
 }
 
 
-private list[str] GetDuplicationStatistics(loc project, int volume, map[list[str], list[duploc]] duplications)
+private list[str] GetCloneStatistics(loc project, int volume, map[list[str], list[cloc]] duplications)
 {
 	list[str] result = [];
 	
@@ -132,10 +132,10 @@ private list[str] GetDuplicationStatistics(loc project, int volume, map[list[str
 	
 	max = 0;
 	list[str] bClassDup = [];
-	list[duploc] bClass = [];
+	list[cloc] bClass = [];
 	for(key <- duplications)
 	{
-		list[duploc] class = duplications[key]; 
+		list[cloc] class = duplications[key]; 
 		int s = size(class);
 		if(s > max)
 		{

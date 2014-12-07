@@ -1,6 +1,6 @@
 module modules::Visualization
 
-import modules::DuplicationSearch;
+import modules::CloneDetector;
 import helpers::Location;
 import helpers::m3;
 
@@ -26,7 +26,7 @@ public list[FProperty] fplist = [std(gap(20)),shrink(0.5),left()];
 
 data PROJECT = project(loc name, list[CLASS] classes);
 data CLASS = class(loc name, list[CLONE] clones);
-data CLONE = clone(loc name, str block, list[duploc] cloneClass);
+data CLONE = clone(loc name, str block, list[cloc] cloneClass);
 
 //which classes were selected by the user?
 public set[CLASS] cSet = {};
@@ -37,7 +37,7 @@ public int minSize = -1;
 public int maxSize = -1;
 
 //Creates data objects from M3 model
-public void RenderClones(M3 model, loc prj, map[list[str], list[duploc]] clones)
+public void RenderClones(M3 model, loc prj, map[list[str], list[cloc]] clones)
 {	
 	set[loc] mdlClasses = {cl | c <- classes(model), cl := FastResolveJava(model, c)}; 
 	map[loc, CLASS] renderClasses = ();
@@ -134,9 +134,9 @@ private Figure drawClassContents(CLASS c)
 		int color = 7;
 		
 		if(size({cs | cs <- cl.cloneClass, c.name.uri != cs[0].uri}) == 0)
-			color = 4;
+			color = 2;
 		else if(size({l | l <- lines, b > l[0] && e < l[1]}) > 0)
-			color = 6;
+			color = 9;
 		
 		for(i <- [b..e + 1])
 			cloneLines += highlight(i,"",color);

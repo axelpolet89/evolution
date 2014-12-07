@@ -9,6 +9,7 @@ import Relation;
 
 import lang::java::m3::Core;
 import helpers::Location;
+import helpers::String;
 
 //return total volume and every compilation unit with their lines of code (needed for duplication scan)
 public tuple[int, map[loc, list[lline]]] GetModelVolume(M3 model, map[str, set[loc]] docs)
@@ -25,8 +26,12 @@ public tuple[int, map[loc, list[lline]]] GetModelVolume(M3 model, map[str, set[l
 		loc cLoc;
 		if (<cUnit, src> <- model@declarations)
     		cLoc = src;
+		
+		set[loc] cDocs = {};
+		if(cLoc.uri in docs)	
+			cDocs = docs[cLoc.uri];
 			
-		list[lline] lines = [line | line <- FilterDocumentation(cLoc, docs[cLoc.uri]), trim(line[0]) != ""];
+		list[lline] lines = [line | line <- FilterDocumentation(cLoc, cDocs), trim(line[0]) != ""];
 
 		//store filtered lines for later use (duplication)
 		cSizes[cLoc] = lines;
@@ -43,60 +48,46 @@ public tuple[int, map[loc, list[lline]]] GetModelVolume(M3 model, map[str, set[l
 	return <volume, cSizes>;
 }
 
-//check if location exists within range of another location 
-private bool IsInRange(loc range, loc target)
-{
-	//target before range
-	if(range.begin.line > target.end.line)
-		return false;
-
-	//target after range
-	if(target.begin.line > range.end.line)
-		return false;
-	
-	return true;
-}
-
 //return list[str] with contents in which documentation is replaced with whitespace
 private list[lline] FilterDocumentation(loc source, set[loc] docs)
 {
 	list[lline] lines = GetLineDescriptors(readFileLines(source));
 	
-	for(d <- docs)
+	for(doc <- docs)
 	{		
-		int sIdx = d.begin.line - source.begin.line;
-		int eIdx = sIdx + (d.end.line - d.begin.line);		
+		int sIdx = lineBgn(doc) - lineBgn(source);
+		int eIdx = sIdx + (lineEnd(doc) - lineBgn(doc));		
 		
 		if(eIdx == sIdx)
 		{
 			str line = lines[sIdx][0];
 						
-			int sCol = d.begin.column;
-			int eCol = d.end.column;		
+			int sCol = colBgn(doc);
+			int eCol = colEnd(doc);		
 			
 			//get correct startindex
 			if(sIdx == 0)
 			{
-				sCol = d.begin.column - source.begin.column;
-				eCol = d.end.column - sCol;
+				sCol = colBgn(doc) - colBgn(source);
+				eCol = colEnd(doc) - sCol;
 			}
 				
 			if(eCol > size(line))
-				eCol = d.end.column - d.begin.column;
+				eCol = colEnd(doc) - colBgn(doc);
 				
-			lines[sIdx] = <ReplaceWithWhiteSpace(line, sCol, eCol), lines[sIdx][1], lines[sIdx][2]>;
+			lines[sIdx] = <FilterStrSection(line, sCol, eCol), lines[sIdx][1], lines[sIdx][2]>;
 		}		
 		else
 		{
 			//first docline
 			str line = lines[sIdx][0];		
-			int sCol = d.begin.column;
+			int sCol = colBgn(doc);
 			
 			//get correct startindex if source.line equals doc.line
 			if(sIdx == 0)
-				sCol = d.begin.column - source.begin.column;
+				sCol = colBgn(doc) - colBgn(source);
 				
-			lines[sIdx] = <ReplaceWithWhiteSpace(line, sCol, size(line)), lines[sIdx][1], lines[sIdx][2]>;
+			lines[sIdx] = <FilterStrSection(line, sCol, size(line)), lines[sIdx][1], lines[sIdx][2]>;
 					
 			//middle doclines	
 			for(idx <- [sIdx+1..eIdx])
@@ -105,15 +96,13 @@ private list[lline] FilterDocumentation(loc source, set[loc] docs)
 			//last docline
 			line = lines[eIdx][0];	
 			sCol = 0;
-			int eCol = d.end.column;
+			int eCol = colEnd(doc);
 			if(eCol > size(line))
-				eCol = d.end.column - d.begin.column;
+				eCol = colEnd(doc) - colBgn(doc);
 			
-			lines[eIdx] = <ReplaceWithWhiteSpace(line, sCol, eCol), lines[eIdx][1], lines[eIdx][2]>;		
+			lines[eIdx] = <FilterStrSection(line, sCol, eCol), lines[eIdx][1], lines[eIdx][2]>;		
 		}
 	}	
 		
 	return lines;						
 }
-
-private str ReplaceWithWhiteSpace(str line, int sCol, int eCol) = substring(line, 0, sCol) + substring(line, eCol);

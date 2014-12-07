@@ -1,4 +1,4 @@
-module modules::DuplicationSearch
+module modules::CloneDetector
 
 import Set;
 import Map;
@@ -9,40 +9,40 @@ import IO;
 
 import helpers::Location;
 
-alias duploc = tuple[loc, int, int];
+alias cloc = tuple[loc, int, int];
 
 // find duplicates, returns a map of duplicate lines along with a list of locations and start/end indices
-public map[list[str], list[duploc]] FindDuplicates (map[loc, list[lline]] compilationUnits)
+public map[list[str], list[cloc]] FindClones (map[loc, list[lline]] allSources)
 {
-	int blockSize = 6;
+	blockSize = 6;
 	
-	map[list[str], duploc] blocks = (); 
-	map[list[str], list[duploc]] dups = ();
+	map[list[str], cloc] blocks = (); 
+	map[list[str], list[cloc]] clones = ();
 	
 	int count = 0;
 	
-	for(key <- compilationUnits)
+	for(key <- allSources)
 	{	
 		count += 1;
 
-		list[lline] source = [s | c <- compilationUnits[key], s := <trim(c[0]),c[1],c[2]>];
+		curSource = [s | c <- allSources[key], s := <trim(c[0]),c[1],c[2]>];
 		
-		if(size(source) < blockSize)
+		if(size(curSource) < blockSize)
 			continue;
 		
 		//keep track of previous matches for extension
-		bool matched = false;
-		duploc prevMatchL = <key, -1, -1>;
-		duploc prevMatchR = <key, -1, -1>;
+		matched = false;
+		cloc prevMatchL = <key, -1, -1>;
+		cloc prevMatchR = <key, -1, -1>;
 		list[str] prevBlock = [];
 		
 		//used for interpolating in existing exstensions
-		map[loc, list[tuple[duploc, duploc]]] curMatches = (); 
+		map[loc, list[tuple[cloc, cloc]]] curMatches = (); 
 		
-		for(i <- [0..size(source)-blockSize])
+		for(i <- [0..size(curSource)-blockSize])
 		{				
 			//list[lline] blockInfo = source[i..(i+blockSize)];
-			list[str] block = [ll[0] | ll <- source[i..(i+blockSize)]];
+			list[str] block = [ll[0] | ll <- curSource[i..(i+blockSize)]];
 			
 			if(block notin blocks)
 			{
@@ -57,13 +57,13 @@ public map[list[str], list[duploc]] FindDuplicates (map[loc, list[lline]] compil
 					prevMatchR = <prevMatchR[0],prevMatchR[1],prevMatchR[2]-1>;
 					
 					//store left/right hand side in dups or just right hand
-					if(prevBlock notin dups)
+					if(prevBlock notin clones)
 					{
-						dups[prevBlock] = [GetActualLocation(prevMatchL, compilationUnits[prevMatchL[0]])] + [GetActualLocation(prevMatchR, source)];
+						clones[prevBlock] = [GetActualLocation(prevMatchL, allSources[prevMatchL[0]])] + [GetActualLocation(prevMatchR, curSource)];
 					}
 					else
 					{
-						dups[prevBlock] += [GetActualLocation(prevMatchR, source)];
+						clones[prevBlock] += [GetActualLocation(prevMatchR, curSource)];
 					}
 					
 					//interpolate in existing matches (in case extensions also have submatches with other code)
@@ -72,10 +72,10 @@ public map[list[str], list[duploc]] FindDuplicates (map[loc, list[lline]] compil
 					{
 						for(cm <- [cm | cm <- curMatches[refMatch], prevMatchL[1] > cm[0][1] && prevMatchL[2] <= cm[0][2]])
 						{
-							duploc refLoc = cm[0];
-							duploc otherLoc = cm[1];
-							duploc extraDup = <otherLoc[0], otherLoc[1] + (prevMatchL[1]-refLoc[1]),otherLoc[2] - (refLoc[2]-prevMatchL[2])>;
-							dups[prevBlock] += [GetActualLocation(extraDup, compilationUnits[extraDup[0]])];							
+							cloc refLoc = cm[0];
+							cloc otherLoc = cm[1];
+							cloc extraClone = <otherLoc[0], otherLoc[1] + (prevMatchL[1]-refLoc[1]),otherLoc[2] - (refLoc[2]-prevMatchL[2])>;
+							clones[prevBlock] += [GetActualLocation(extraClone, allSources[extraClone[0]])];							
 						}
 					}
 					else
@@ -97,7 +97,7 @@ public map[list[str], list[duploc]] FindDuplicates (map[loc, list[lline]] compil
 			else
 			{
 				matched = true;
-				duploc curMatch = <key,i,i+blockSize>;
+				cloc curMatch = <key,i,i+blockSize>;
 
 				//extend search if this match is one line further than previous match
 				if(prevMatchR[2] == curMatch[2]-1)
@@ -116,29 +116,29 @@ public map[list[str], list[duploc]] FindDuplicates (map[loc, list[lline]] compil
 		}
 		
 		if(count % 10 == 0)
-			println("<count> compilation units checked for duplications so far..");
+			println("<count> compilation units checked for clones so far..");
 	}
 	
-	println("--\> checked <count> compilation unites for duplications in total");
+	println("--\> checked <count> compilation unites for clones in total");
 	
-	return dups;
+	return clones;
 }
 
-public int GetCloneTotal(map[list[str], list[duploc]] ccs)
+public int GetCloneTotal(map[list[str], list[cloc]] ccs)
 {
-	map[str, list[duploc]] sccs = GetSortedCcs(ccs);
+	sccs = GetSortedCcs(ccs);
 	
 	for(key <- sccs)
 	{
 		//start with smallest clone in comp-unit
-		list[duploc] dup = reverse(sccs[key]);
-		for(d <- dup)
+		clones = reverse(sccs[key]);
+		for(clone <- clones)
 		{
 			//check if any wrappers exist that cover this clone entirely
-			list[duploc] cloneWrappers = [pc | pc <- dup, (d[1] > pc[1] && d[2] <= pc[2]) 
-															|| (d[1] >= pc[1] && d[2] < pc[2])];
+			list[cloc] cloneWrappers = [cw | cw <- clones, (clone[1] > cw[1] && clone[2] <= cw[2]) 
+															|| (clone[1] >= cw[1] && clone[2] < cw[2])];
 			if(size(cloneWrappers) > 0)
-				sccs[key] = sccs[key] - d;
+				sccs[key] = sccs[key] - clone;
 		}
 	}
 	
@@ -149,14 +149,14 @@ public int GetCloneTotal(map[list[str], list[duploc]] ccs)
 	return toInt(total);
 }
 
-public map[str, list[duploc]] GetSortedCcs(map[list[str], list[duploc]] ccs)
+private map[str, list[cloc]] GetSortedCcs(map[list[str], list[cloc]] ccs)
 {
-	map[str, list[duploc]] sccs = ();
+	map[str, list[cloc]] sccs = ();
 	
 	//transform cloneclasses into sorted comp-unit -> clones
 	for(key <- ccs)
 	{
-		list[duploc] cclass = ccs[key];
+		list[cloc] cclass = ccs[key];
 		for(c <- cclass)
 		{
 			str cUri = c[0].uri;
@@ -173,16 +173,16 @@ public map[str, list[duploc]] GetSortedCcs(map[list[str], list[duploc]] ccs)
 	
 	//sort clones descending per comp-unit 
 	for(key <- sccs)
-		sccs[key] = sort(sccs[key], bool(duploc a, duploc b){ return (a[2]-a[1]) > (b[2]-b[1]); });
+		sccs[key] = sort(sccs[key], bool(cloc a, cloc b){ return (a[2]-a[1]) > (b[2]-b[1]); });
 		
 	return sccs;
 }
 
-public duploc GetActualLocation(duploc orig, list[lline] source)
+private cloc GetActualLocation(cloc orig, list[lline] source)
 {
 	lline s = source[orig[1]];		//get original lline for the begin of match
 	lline e = source[orig[2]];		//get original lline for the end of match
 	lline n = source[orig[2]+1];	//get original lline for the next match
-	int length = n[2]-s[2];			//length in chars/bytes	
+	length = n[2]-s[2];				//length in chars/bytes	
 	return <ModifyLocation(orig[0],s[2],length,s[1],e[1]), orig[1], orig[2]>;
 }
