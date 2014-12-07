@@ -130,7 +130,7 @@ public int GetCloneTotal(map[list[str], list[duploc]] ccs)
 	
 	for(key <- sccs)
 	{
-		//start with smalles clone in comp-unit
+		//start with smallest clone in comp-unit
 		list[duploc] dup = reverse(sccs[key]);
 		for(d <- dup)
 		{
@@ -149,24 +149,24 @@ public int GetCloneTotal(map[list[str], list[duploc]] ccs)
 	return toInt(total);
 }
 
-private map[str, list[duploc]] GetSortedCcs(map[list[str], list[duploc]] ccs)
+public map[str, list[duploc]] GetSortedCcs(map[list[str], list[duploc]] ccs)
 {
 	map[str, list[duploc]] sccs = ();
 	
 	//transform cloneclasses into sorted comp-unit -> clones
 	for(key <- ccs)
 	{
-		list[duploc] dup = ccs[key];
-		for(d <- dup)
+		list[duploc] cclass = ccs[key];
+		for(c <- cclass)
 		{
-			str dUri = d[0].uri;
-			if(dUri notin sccs)
+			str cUri = c[0].uri;
+			if(cUri notin sccs)
 			{
-				sccs[dUri] = [d];
+				sccs[cUri] = [c];
 			}
 			else
 			{
-				sccs[dUri] += [d];
+				sccs[cUri] += [c];
 			}
 		}
 	}

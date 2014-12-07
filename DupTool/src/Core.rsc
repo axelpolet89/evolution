@@ -2,16 +2,16 @@ module Core
 
 import modules::CodeCleaner;
 import modules::DuplicationSearch;
+import modules::Visualization;
+import helpers::m3;
 
 import lang::java::jdt::m3::Core;
-import lang::java::m3::Registry;
 import util::Math;
 
 import IO;
 import DateTime;
 import Set;
 import Map;
-import Relation;
 import List;
 
 public loc prjDude = |project://Dude|;
@@ -25,38 +25,6 @@ public loc prjDE = |project://DuplicationExamples|;
 alias lline = tuple[str,int,int];
 
 private loc outputFolder = |file:///c:/users/axel/desktop|;
-
-//Get all documentation for M3, mapped on java file - javadoc? - documentation
-private map[str,  set[loc]] ParseDocs(M3 model)
-{
-	map[str, set[loc]] docs = ();
-	
-	int total = size(model@documentation);
-	println("--\> # of docs in M3: <total>");
-	println("--\> started mapping docs on compilation-unit uri...");	
-	
-	int count = 0;
-	for(doc <- model@documentation)
-	{	
-		str cUri;
-		loc d = doc[0];
-		if (<d, src> <- model@declarations)
-    		cUri = src.uri;
-      
-		if(cUri in docs)
-			docs[cUri] += { doc[1] };
-		else
-			docs[cUri] = { doc[1] };	
-		
-		count +=1;
-		
-		if(count % 100 == 0)
-			println("--\> mapped <count> of <total> docs so far.."); 
-	}
-	
-	println("--\> mapped documentation on <size(docs)> compilation-units!");
-	return docs;
-}
 
 private str ParseDuration(datetime s, datetime e)
 {
@@ -92,7 +60,7 @@ public void ComputeMetrics(loc project)
 	list[str] timings = [];
 
 	println("started building M3 model...");
-	M3 model = createM3FromEclipseProject(project);
+	M3 model = GenerateM3(project);
 	println("M3 model built!\n");	
 	
 	println("started gathering docs...");
@@ -113,15 +81,11 @@ public void ComputeMetrics(loc project)
 	int duplicateLOC = 0;
 	println("\nstarted search for duplicates...");
 	datetime s4 = now();
-	//duplicateLOC = CountDuplicateLines(compilationUnits<1>);
 	duplications = FindDuplicates(compilationUnits<1>);
 	datetime e4 = now();
 	timings += "--\> Duplication search time: <ParseDuration(s4, e4)>";
 	println("completed duplicates search!");
-	
-	//println("\n--\> Total LOC : <volume>");
-	//println("--\> Total LOC in duplicates: <duplicateLOC>");
-	//println("\nduplication percentage: <GetPercentage(duplicateLOC, volume)>%");
+
 	println("");
 	for(t <- timings)
 		println(t);
@@ -134,6 +98,8 @@ public void ComputeMetrics(loc project)
 	loc outputFile = outputFolder + "report_duptool_<printTime(now(), "yyyyMMdd_HH-mm-ss")>.txt";
 	//ListToFile(outputFile, stats);
 	println("\nStatistics saved in <outputFile>");
+	
+	RenderClones(model, project, duplications);
 }
 
 
