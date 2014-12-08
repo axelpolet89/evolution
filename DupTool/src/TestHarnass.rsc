@@ -18,6 +18,19 @@ private loc th = |project://DuplicationExamples|;
 private bool passed = true;
 alias utr = tuple[bool,str];
 
+private tuple[int, map[loc,list[lline]]] GetSourceForTest()
+{
+	M3 model = GenerateM3(th);
+		
+	docs = ParseDocs(model);
+	println("docs gathered!\n");
+	
+	compilationUnits = GetModelVolume(model, docs);
+	println("volume computed!\n");
+	
+	return compilationUnits;
+}
+
 /* 
 	Unit tests: do individual units of computation work as expected?
 */
@@ -36,6 +49,8 @@ public void StartUnitTests()
 	results += TstFastResolveJava(model);
 	
 	results += TstFilterStrSection();
+	
+	results += TstCloneSortFilter(GetSourceForTest());
 	
 	list[utr] faults = [r | r <- results, r[0] == false];
 	if(size(faults) > 0)
@@ -182,14 +197,7 @@ public void StartFAT()
 				"project://DuplicationExamples/src/extension.java"};
 
 	println("FAT start!\n");
-	M3 model = GenerateM3(th);
-		
-	docs = ParseDocs(model);
-	println("docs gathered!\n");
-	
-	compilationUnits = GetModelVolume(model, docs);
-	println("volume computed!\n");	
-	
+	compilationUnits = GetSourceForTest();
 	clones = FindClones(compilationUnits<1>);
 	println("clone detection completed!\n");
 	

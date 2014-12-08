@@ -126,30 +126,37 @@ public map[list[str], list[cloc]] FindClones (map[loc, list[lline]] allSources)
 
 public int GetCloneTotal(map[list[str], list[cloc]] ccs)
 {
-	sccs = GetSortedCcs(ccs);
+	clones = SortClonesByUnit(ccs);
+	clones = FilterDoubles(clones);
+		
+	num total = 0;
+	for(cs <- range(clones))		
+		total += sum([len | c <- cs, len := (c[2]-c[1]+1)]);
+		
+	return toInt(total);
+}
+
+private map[str, list[cloc]] FilterDoubles(map[str, list[cloc]] clsByUnit)
+{
+	result = clsByUnit;
 	
-	for(key <- sccs)
+	for(key <- result)
 	{
-		//start with smallest clone in comp-unit
-		clones = reverse(sccs[key]);
+		clones = result[key];
 		for(clone <- clones)
 		{
 			//check if any wrappers exist that cover this clone entirely
 			list[cloc] cloneWrappers = [cw | cw <- clones, (clone[1] > cw[1] && clone[2] <= cw[2]) 
 															|| (clone[1] >= cw[1] && clone[2] < cw[2])];
 			if(size(cloneWrappers) > 0)
-				sccs[key] = sccs[key] - clone;
+				result[key] = result[key] - clone;
 		}
 	}
 	
-	num total = 0;
-	for(cs <- range(sccs))		
-		total += sum([len | c <- cs, len := (c[2]-c[1]+1)]);
-		
-	return toInt(total);
+	return result;
 }
 
-private map[str, list[cloc]] GetSortedCcs(map[list[str], list[cloc]] ccs)
+private map[str, list[cloc]] SortClonesByUnit(map[list[str], list[cloc]] ccs)
 {
 	map[str, list[cloc]] sccs = ();
 	
@@ -171,9 +178,9 @@ private map[str, list[cloc]] GetSortedCcs(map[list[str], list[cloc]] ccs)
 		}
 	}
 	
-	//sort clones descending per comp-unit 
+	//sort clones ascending per comp-unit 
 	for(key <- sccs)
-		sccs[key] = sort(sccs[key], bool(cloc a, cloc b){ return (a[2]-a[1]) > (b[2]-b[1]); });
+		sccs[key] = sort(sccs[key], bool(cloc a, cloc b){ return (a[2]-a[1]) < (b[2]-b[1]); });
 		
 	return sccs;
 }
@@ -185,4 +192,42 @@ private cloc GetActualLocation(cloc orig, list[lline] source)
 	lline n = source[orig[2]+1];	//get original lline for the next match
 	length = n[2]-s[2];				//length in chars/bytes	
 	return <ModifyLocation(orig[0],s[2],length,s[1],e[1]), orig[1], orig[2]>;
+}
+
+
+/*
+	Unit test
+*/
+public tuple[bool, str] TstCloneSortFilter(tuple[int,map[loc,list[lline]]] source)
+{
+	map[list[str], list[cloc]] ccs = FindClones(source[1]);
+	map[str, list[cloc]] clones = SortClonesByUnit(ccs);
+	
+	int lastSize = 0;
+	for(key <- clones)
+	{
+		fst = head(clones[key]);
+		lastSize = fst[2] - fst[1];
+		for(c <- clones[key])
+		{
+			curSize = c[2]-c[1]; 
+			if(curSize < lastSize)
+				return<false, "at SortClonesByUnit()\r\nclones for unit <key> not sorted by ascending:\r\n<clones[key]>">;
+			lastSize = curSize;
+		}
+	}
+	
+	clones = FilterDoubles(clones);
+	
+	for(key <- clones)
+	{
+		list[cloc] curClones = clones[key];
+		for(c <- clones[key])
+		{
+			if(size([cw | cw <- curClones, (c[1] > cw[1] && c[2] <= cw[2]) || (c[1] >= cw[1] && c[2] < cw[2])]) > 0)
+				return<false, "at FilterDoubles()\r\nthere exist a clone <c>\r\nfor unit <key> that is wrapped by larger clones:\r\n<curClones>">;
+		}
+	}
+	
+	return <true, "">;
 }
