@@ -1,22 +1,21 @@
 module TestHarnass
 
+import IO;
+import Set;
+import List;
+import Map;
+import util::Math;
+import lang::java::jdt::m3::Core;
+import lang::java::m3::Registry;
+
 import modules::CodeCleaner;
 import modules::CloneDetector;
 import helpers::m3;
 import helpers::Location;
 import helpers::String;
-
-import IO;
-import Set;
-import Map;
-import List;
-import util::Math;
-import lang::java::jdt::m3::Core;
-import lang::java::m3::Registry;
+import helpers::Percentage;
 
 private loc th = |project://DuplicationExamples|;
-private bool passed = true;
-alias utr = tuple[bool,str];
 
 private tuple[int, map[loc,list[lline]]] GetSourceForTest()
 {
@@ -31,38 +30,44 @@ private tuple[int, map[loc,list[lline]]] GetSourceForTest()
 	return compilationUnits;
 }
 
-/* 
+/*==================================================================
 	Unit tests: do individual units of computation work as expected?
-*/
+==================================================================*/
+alias utr = tuple[bool,str];
 
-public void StartUnitTests()
+public void PerformUnitTests()
 {
-	println("unit-tests started!");
-	list[utr] results = [];
+	println("Initialized unit-tests...");
 	
+	list[utr] results = [];
+		
 	results += TstModifyLocation();
 	results += TstGetLineDescriptors();
 	results += TstIsInRange();
 	results += TstLocSelectors();
 
-	M3 model = GenerateM3(th);
+	model = GenerateM3(th);
 	results += TstFastResolveJava(model);
 	
 	results += TstFilterStrSection();
 	
+	results += TstGetPercentage();
+	
 	results += TstCloneSortFilter(GetSourceForTest());
 	
-	list[utr] faults = [r | r <- results, r[0] == false];
+	total = size(results);
+	
+	faults = [r | r <- results, r[0] == false];
 	if(size(faults) > 0)
 	{
 		println("unit-tests failed!\n");
 		for(f <- faults)
 			println(f[1]);
-		println("\nunit-tests failed!");	
+		println("\nunit-tests failed!: <size(faults)> out of <total>");	
 		return;
 	}
 	
-	println("unit-tests succeeded!");
+	println("All unit-tests succeeded: <total> out of <total>");
 }
 
 //helpers::Location
@@ -167,7 +172,7 @@ private utr TstFastResolveJava(M3 model)
 	return <true,"">;
 }
 
-//helpers::string
+//helpers::String
 private utr TstFilterStrSection()
 {
 	str source = "Hello world!";
@@ -180,16 +185,31 @@ private utr TstFilterStrSection()
 	return <true,"">;
 }
 
+//helpers::Percentage
+private utr TstGetPercentage()
+{
+	n1 = 3333;
+	n2 = 10000;
+	real exp = 33.33;
+	real res = GetPercentage(n1,n2);	
+	
+	if(exp != res)
+		return <false, "at helpers::Percentage::GetPercentage()\r\nexp:<exp>\r\nres:<res>">;
+
+	return <true,"">;
+}
 
 
-/*
- 	FA test, do the clone detection results match with our expectations?
-*/
-public void StartFAT()
+/*======================================================================
+ 	FAT (functional acceptation test), 
+ 	do the clone detection results match with our expectations?
+======================================================================*/
+private bool passed = true;
+public void PerformFAT()
 {
 	expVol = 133;
 	expClones = 56;
-	expPerc = 42.13;
+	expPerc = 42.11;
 	expCcsNo = 3;
 	expBig = 15;
 	expCus = {"project://DuplicationExamples/src/utils.java",
@@ -229,8 +249,8 @@ public void StartFAT()
 	PrintFTR("# of CC\t",bool(){return expCcsNo == foundCcsNo;},expCcsNo,foundCcsNo);
 	PrintFTR("Biggest\t",bool(){return expBig == foundBig;},expBig,foundBig);
 	PrintFTR("Comp-units",bool(){return expCus == foundCus;},expCus,foundCus);
-	if(passed) println("\ntests passed!");
-	else println("\n1 or more tests failed!");
+	if(passed) println("\nAll FAT tests passed!");
+	else println("\none or more FAT tests failed!");
 }
 
 private str bts(bool() assertion)
@@ -243,4 +263,3 @@ private str bts(bool() assertion)
 }
 
 private void PrintFTR(str name, bool() assertion, value e, value f) = println("<name>\t<bts(assertion)>\texpected:\t<e>\n\t\t\tfound:\t\t<f>\n");
-private real GetPercentage(int num1, int num2) = round(toReal(num1)/toReal(num2)*100,0.11);

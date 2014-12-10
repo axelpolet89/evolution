@@ -10,14 +10,15 @@ import IO;
 import helpers::Location;
 
 alias cloc = tuple[loc, int, int];
+alias cclasses = map[list[str],list[cloc]];
 
 // find duplicates, returns a map of duplicate lines along with a list of locations and start/end indices
-public map[list[str], list[cloc]] FindClones (map[loc, list[lline]] allSources)
+public cclasses FindClones (map[loc, list[lline]] allSources)
 {
 	blockSize = 6;
 	
 	map[list[str], cloc] blocks = (); 
-	map[list[str], list[cloc]] clones = ();
+	cclasses clones = ();
 	
 	int count = 0;
 	
@@ -124,19 +125,26 @@ public map[list[str], list[cloc]] FindClones (map[loc, list[lline]] allSources)
 	return clones;
 }
 
-public int GetCloneTotal(map[list[str], list[cloc]] ccs)
+/*=====================================================
+Count clones SLOC, need to filter duplicate clonelines
+======================================================*/
+public int GetCloneTotal(cclasses ccs)
 {
+	println(ccs);
 	clones = SortClonesByUnit(ccs);
-	clones = FilterDoubles(clones);
+	println(clones);
+	clones = FilterDuplicates(clones);
+	println(clones);
 		
 	num total = 0;
 	for(cs <- range(clones))		
 		total += sum([len | c <- cs, len := (c[2]-c[1]+1)]);
 		
+	println(total);
 	return toInt(total);
 }
 
-private map[str, list[cloc]] FilterDoubles(map[str, list[cloc]] clsByUnit)
+private map[str, list[cloc]] FilterDuplicates(map[str, list[cloc]] clsByUnit)
 {
 	result = clsByUnit;
 	
@@ -156,7 +164,7 @@ private map[str, list[cloc]] FilterDoubles(map[str, list[cloc]] clsByUnit)
 	return result;
 }
 
-private map[str, list[cloc]] SortClonesByUnit(map[list[str], list[cloc]] ccs)
+private map[str, list[cloc]] SortClonesByUnit(cclasses ccs)
 {
 	map[str, list[cloc]] sccs = ();
 	
@@ -195,11 +203,11 @@ private cloc GetActualLocation(cloc orig, list[lline] source)
 }
 
 
-/*
+/*================
 	Unit test
-*/
+=================*/
 public tuple[bool, str] TstCloneSortFilter(tuple[int,map[loc,list[lline]]] source)
-{
+{ 
 	map[list[str], list[cloc]] ccs = FindClones(source[1]);
 	map[str, list[cloc]] clones = SortClonesByUnit(ccs);
 	
@@ -217,7 +225,7 @@ public tuple[bool, str] TstCloneSortFilter(tuple[int,map[loc,list[lline]]] sourc
 		}
 	}
 	
-	clones = FilterDoubles(clones);
+	clones = FilterDuplicates(clones);
 	
 	for(key <- clones)
 	{

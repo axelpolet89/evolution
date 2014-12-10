@@ -38,25 +38,6 @@ public class utils
 		String e1 = "s2";
 	}
 	
-	/*
-	public void SmallOuterDuplicate2()
-	{
-		String anders = "anders";
-		String test2 = "2";
-		String test3 = "3";
-		String test = "";
-		String test1 = "1";
-		if(test2 == "")
-		{
-			test3 = "1+1";
-		}
-		for(int i = 0; i < 10; i++)
-		{
-			test = "lala";
-		}
-	}
-	*/
-	
 	public void NoDuplicate()
 	{
 		String test = "";

@@ -1,5 +1,5 @@
 /*
- * This class contains clones of size 5
+ * This class contains clones of size 5, should not be detected
  */
 public class helper
 {

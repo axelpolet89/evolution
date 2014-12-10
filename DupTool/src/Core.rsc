@@ -1,28 +1,25 @@
 module Core
 
+import IO;
+import DateTime;
+import Set;
+import List;
+import Map;
+import util::Math;
+import lang::java::jdt::m3::Core;
+
 import modules::CodeCleaner;
 import modules::CloneDetector;
 import modules::Visualization;
 import helpers::m3;
+import helpers::Location;
+import helpers::Percentage;
 
-import lang::java::jdt::m3::Core;
-import util::Math;
-
-import IO;
-import DateTime;
-import Set;
-import Map;
-import List;
-
-public loc prjDude = |project://Dude|;
-public loc prjDude2 = |project://Dude/src|;
 public loc prjSS = |project://SmallSql|;
 public loc prjSS2 = |project://smallsql0.21|;
 public loc prjHS = |project://hsqldb|;
 public loc prjHS2 = |project://hsqldb-2.3.1|;
 public loc prjDE = |project://DuplicationExamples|;
-
-alias lline = tuple[str,int,int];
 
 private loc outputFolder = |file:///c:/users/axel/desktop|;
 
@@ -32,30 +29,27 @@ private str ParseDuration(datetime s, datetime e)
 	return "<d[4]> minutes, <d[5]>.<d[6]> seconds";
 }
 
-private real GetPercentage(int num1, int num2) = round(toReal(num1)/toReal(num2)*100,0.11);
-
-public void ComputeDude()
+public void InitCDSS(bool saveToFile)
 {
-	 ComputeMetrics(prjDude);
+	 InitCloneDetection(prjSS, saveToFile);
 }
 
-public void ComputeSS()
+public void InitCDHS(bool saveToFile)
 {
-	 ComputeMetrics(prjSS);
+	 InitCloneDetection(prjHS, saveToFile);
 }
 
-public void ComputeHS()
+public void InitCDDE(bool saveToFile)
 {
-	 ComputeMetrics(prjHS);
+	 InitCloneDetection(prjDE, saveToFile);
 }
 
-public void ComputeDE()
-{
-	ComputeMetrics(prjDE);
-}
 
-//Main call to compute SIG metrics
-public void ComputeMetrics(loc project)
+/*==================================================================
+	Main Call for Clone Detection
+==================================================================*/
+
+public void InitCloneDetection(loc project, bool saveToFile)
 {
 	list[str] timings = [];
 
@@ -65,14 +59,14 @@ public void ComputeMetrics(loc project)
 	
 	println("started gathering docs...");
 	datetime sD = now();
-	map[str, set[loc]] docs = ParseDocs(model);
+	docs = ParseDocs(model);
 	datetime eD = now();
 	timings += "--\> Documentation gather time: <ParseDuration(sD, eD)>";
 	println("docs gathered!\n");
 	
 	println("started computing volume...");
 	datetime s1 = now();
-	tuple[int, map[loc, list[lline]]] compilationUnits = GetModelVolume(model, docs);
+	compilationUnits = GetModelVolume(model, docs);
 	int volume = compilationUnits<0>;		
 	datetime e1 = now();
 	timings += "--\> Volume process time: <ParseDuration(s1, e1)>";
@@ -81,61 +75,68 @@ public void ComputeMetrics(loc project)
 	int duplicateLOC = 0;
 	println("\nstarted search for clones...");
 	datetime s4 = now();
-	duplications = FindClones(compilationUnits<1>);
+	clones = FindClones(compilationUnits<1>);
 	datetime e4 = now();
 	timings += "--\> clone search time: <ParseDuration(s4, e4)>";
-	println("completed clone search!");
+	println("clone detection completed!");
 
 	println("");
 	for(t <- timings)
 		println(t);
 	
 	println("\n");	
-	list[str] stats = GetCloneStatistics(project, volume, duplications);
+	list[str] stats = GetCloneStatistics(project, volume, clones);
 	for(s <- stats)
 		println(s);	
 	
-	loc outputFile = outputFolder + "report_duptool_<printTime(now(), "yyyyMMdd_HH-mm-ss")>.txt";
-	//ListToFile(outputFile, stats);
-	println("\nStatistics saved in <outputFile>");
+	if(saveToFile)
+	{
+		loc outputFile = outputFolder + "report_CDtool_<printTime(now(), "yyyyMMdd_HH-mm-ss")>.txt";
+		ListToFile(outputFile, stats);
+		println("\nStatistics saved in <outputFile>");
+	}
 	
-	RenderClones(model, project, duplications);
+	println("\nRendering clones...");
+	RenderClones(model, project, clones);
 }
 
-
-private list[str] GetCloneStatistics(loc project, int volume, map[list[str], list[cloc]] duplications)
+/*==================================================================
+	Compute clone statistics and transform them into 
+	representational information
+==================================================================*/
+private list[str] GetCloneStatistics(loc project, int volume, cclasses clones)
 {
 	list[str] result = [];
 	
 	result += "Duplication Statistics for Java project: <project.uri>\r\n";
 	result += "Volume:\t\t\t\t<volume> SLOC";
 		
-	int dupsVol = GetCloneTotal(duplications);
+	int dupsVol = GetCloneTotal(clones);
 	
 	result += "Duplicate lines:\t\t<dupsVol> SLOC";
 	result += "Percentage of clones:\t\t<GetPercentage(dupsVol, volume)>%\r\n";
 	
-	result += "Total # of clone classes:\t<size(domain(duplications))>\r\n";
+	result += "Number of clone classes:\t<size(domain(clones))>\r\n";
 	
-	set[list[str]] dups = domain(duplications);
+	set[list[str]] blocks = domain(clones);
 	int max = 0;
-	list[str] bDup = [];
-	for(d <- dups)
+	list[str] bClone = [];
+	for(b <- blocks)
 	{
-		int s = size(d);
+		int s = size(b);
 		if(s > max)
 		{
 			max = s;
-			bDup = d;
+			bClone = b;
 		}
 	}
 	
 	max = 0;
-	list[str] bClassDup = [];
+	list[str] bCloneClass= [];
 	list[cloc] bClass = [];
-	for(key <- duplications)
+	for(key <- clones)
 	{
-		list[cloc] class = duplications[key]; 
+		list[cloc] class = clones[key]; 
 		int s = size(class);
 		if(s > max)
 		{
@@ -145,21 +146,24 @@ private list[str] GetCloneStatistics(loc project, int volume, map[list[str], lis
 		}
 	}
 	
-	result += "Biggest clone:\t\t\t<size(bDup)> SLOC\r\n";
-	for(i <- [0..size(bDup)])
-		result += "\t\t\t\t<bDup[i]>"; 
+	result += "Biggest clone:\t\t\t<size(bClone)> SLOC\r\n";
+	for(i <- [0..size(bClone)])
+		result += "\t\t\t\t<bClone[i]>"; 
 	
-	result += "\r\nBiggest clone class:\t\t<bClass[0][0]> -\> line <bClass[0][0].begin.line> to <bClass[0][0].end.line>";
-	for(i <- [1..size(bClass)])		
+	result += "\r\nBiggest clone class (<size(bClass)>):\t\t";
+	for(i <- [0..size(bClass)])		
 		result += "\t\t\t\t<bClass[i][0]>  -\> line <bClass[i][0].begin.line> to <bClass[i][0].end.line>";
 	result+="";
-	for(i <- [0..size(bClassDup)])
-		result += "\t\t\t\t<bClassDup[i]>"; 
+	for(i <- [0..size(bCloneClass)])
+		result += "\t\t\t\t<bCloneClass[i]>"; 
 	
 	
 	return result;
 }
 
+/*==================================================================
+	Save list of strings (lines) to a file
+==================================================================*/
 private void ListToFile(loc file, list[str] lines)
 {	
 	if(!isFile(file))

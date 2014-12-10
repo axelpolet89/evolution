@@ -12,13 +12,6 @@ public class core {
 	public static void main(String[] args) {
 	}
 	
-	/*
-	 * DupSource, DupSource regel 1-15
-	 * DupSource, DupSource, SmallInnerDuplicate, SmallOuterDuplicate regel 2-8
-	 * DupSource, DupSource, FullInnerDuplicate, regel 2-15
-	 * DupSource, DupSource, SmallOuterDupicate2, regel 7-15
-	 */
-	
 	//comment
 	public void DupSource()
 	{

@@ -12,8 +12,7 @@ public M3 GenerateM3(loc project)
 
 public loc FastResolveJava(M3 model, loc source)
 {
-	if (<source, jsource> <- model@declarations)
-		return jsource;
+	return min(model@declarations[source]);
 }
 
 //Get all documentation for M3, mapped on java file - javadoc? - documentation
@@ -27,11 +26,8 @@ public map[str,  set[loc]] ParseDocs(M3 model)
 	
 	int count = 0;
 	for(doc <- model@documentation)
-	{	
-		str cUri;
-		loc d = doc[0];
-		if (<d, src> <- model@declarations)
-    		cUri = src.uri;
+	{
+    	str cUri = FastResolveJava(model, doc[0]).uri;
       
 		if(cUri in docs)
 			docs[cUri] += { doc[1] };
@@ -43,6 +39,7 @@ public map[str,  set[loc]] ParseDocs(M3 model)
 		if(count % 100 == 0)
 			println("--\> mapped <count> of <total> docs so far.."); 
 	}
+	
 	
 	println("--\> mapped documentation on <size(docs)> compilation-units!");
 	return docs;
